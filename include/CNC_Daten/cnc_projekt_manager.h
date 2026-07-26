@@ -4,6 +4,7 @@
 #include "web/app_state.h"
 #include "CNC_Daten/project_file_reader.h"
 #include "CNC_Daten/preview_renderer.h"
+#include <functional>
 #include <memory>
 #include <string>
 #include <tuple>
@@ -45,6 +46,14 @@ public:
      * @brief Setzt die Datenblock-Größe
      */
     void setDataArrayLength(int length);
+
+    /**
+     * @brief Registers a callback invoked periodically inside blocking wait
+     * loops (transferProjectData, LiveImage). The callback keeps the SPS
+     * heartbeat running while this thread waits for the PLC handshake and
+     * returns false when the loop must abort (shutdown or connection loss).
+     */
+    void setKeepAlive(std::function<bool()> callback);
     
     /**
      * @brief Getter für Bildbreite
@@ -97,6 +106,7 @@ private:
     int imageSizeX_;
     int imageSizeY_;
     int lenDataArray_;
+    std::function<bool()> keepAlive_;
     
     // Helper-Klassen
     std::unique_ptr<ProjectFileReader> fileReader_;

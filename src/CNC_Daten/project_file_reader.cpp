@@ -138,12 +138,14 @@ std::vector<std::string> ProjectFileReader::readDataBlock(
             line.pop_back();
         }
 
-        // Header überspringen (falls gewünscht)
-        /*if (firstLine)
+        // Skip the header line - must match countRecords(), otherwise every
+        // block is shifted by one line and the PLC receives the header as its
+        // first record while the last G-code line is never transferred.
+        if (firstLine)
         {
             firstLine = false;
             continue;
-        }*/
+        }
         
         // Reine Leerzeilen überspringen
         bool onlySpace = true;

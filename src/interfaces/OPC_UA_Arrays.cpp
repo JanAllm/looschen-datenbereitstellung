@@ -870,6 +870,7 @@ std::tuple<bool, int> OPCClient::writeStringArray(const VariableInfo &var, const
     UA_StatusCode status = UA_Client_readValueAttribute(client, node, &variant);
     if (status != UA_STATUSCODE_GOOD || variant.type != &UA_TYPES[UA_TYPES_STRING] || variant.arrayLength == 0)
     {
+        UA_Variant_clear(&variant);
         return {false, 2};
     }
 
@@ -893,38 +894,23 @@ std::tuple<bool, int> OPCClient::writeStringArray(const VariableInfo &var, const
         return {false, 3};
     }
 
-    UA_String *existing = static_cast<UA_String *>(variant.data);
-    std::vector<UA_String> uaStrings(existing, existing + variant.arrayLength);
-
+    // Patch the requested window in place. `variant` keeps ownership of every
+    // element (old and newly allocated), so the single UA_Variant_clear below
+    // frees everything. The previous copy-based version leaked the variant and
+    // the allocated strings on every successful call.
+    UA_String *elements = static_cast<UA_String *>(variant.data);
     for (size_t row = 0; row < rows; ++row)
     {
         for (size_t col = 0; col < cols; ++col)
         {
             size_t index = (startRow + row) * dim2 + (startCol + col);
-            UA_String_clear(&uaStrings[index]);
-            uaStrings[index] = UA_STRING_ALLOC(data[row][col].c_str());
+            UA_String_clear(&elements[index]);
+            elements[index] = UA_STRING_ALLOC(data[row][col].c_str());
         }
     }
 
-    UA_Variant newVariant;
-    UA_Variant_init(&newVariant);
-    status = UA_Variant_setArrayCopy(&newVariant, uaStrings.data(), uaStrings.size(), &UA_TYPES[UA_TYPES_STRING]);
-    if (status != UA_STATUSCODE_GOOD)
-    {
-        for (auto &uaStr : uaStrings)
-            UA_String_clear(&uaStr);
-        UA_Variant_clear(&variant);
-        return {false, 4};
-    }
-
-    newVariant.arrayDimensionsSize = variant.arrayDimensionsSize;
-    newVariant.arrayDimensions = (UA_UInt32 *)UA_Array_new(newVariant.arrayDimensionsSize, &UA_TYPES[UA_TYPES_UINT32]);
-    for (size_t i = 0; i < newVariant.arrayDimensionsSize; ++i)
-    {
-        newVariant.arrayDimensions[i] = variant.arrayDimensions[i];
-    }
-
-    status = UA_Client_writeValueAttribute(client, node, &newVariant);
+    status = UA_Client_writeValueAttribute(client, node, &variant);
+    UA_Variant_clear(&variant);
 
     if (status == UA_STATUSCODE_GOOD)
     {
@@ -976,53 +962,29 @@ OPCClient::writeWStringArray(const VariableInfo &var,
         return { false, 3 };
     }
 
-    UA_ByteString *existing = static_cast<UA_ByteString *>(variant.data);
-    std::vector<UA_ByteString> uaData(existing, existing + variant.arrayLength);
-
+    // Patch the requested window in place (same ownership model as
+    // writeStringArray). The previous copy-based version cleared the aliased
+    // element copies AND the variant afterwards - a double free of every
+    // element outside the patched window.
+    UA_ByteString *elements = static_cast<UA_ByteString *>(variant.data);
     for (size_t r = 0; r < rows; ++r) {
         for (size_t c = 0; c < cols; ++c) {
             size_t idx = (startRow + r) * dim2 + (startCol + c);
-            UA_ByteString_clear(&uaData[idx]);
+            UA_ByteString_clear(&elements[idx]);
 
             const std::wstring &ws = data[r][c];
             size_t byteLen = ws.size() * sizeof(wchar_t);
             UA_ByteString bs;
-            bs.length = static_cast<UA_UInt32>(byteLen);
+            bs.length = byteLen;
             bs.data = static_cast<UA_Byte *>(UA_malloc(byteLen));
             memcpy(bs.data, ws.data(), byteLen);
 
-            uaData[idx] = bs;
+            elements[idx] = bs;
         }
     }
 
-    UA_Variant newVariant;
-    UA_Variant_init(&newVariant);
-    status = UA_Variant_setArrayCopy(
-        &newVariant,
-        uaData.data(),
-        uaData.size(),
-        &UA_TYPES[UA_TYPES_BYTESTRING]
-    );
-    if (status != UA_STATUSCODE_GOOD) {
-        for (auto &bs : uaData) UA_ByteString_clear(&bs);
-        UA_Variant_clear(&variant);
-        return { false, 4 };
-    }
-
-    newVariant.arrayDimensionsSize = variant.arrayDimensionsSize;
-    newVariant.arrayDimensions = 
-        static_cast<UA_UInt32 *>(UA_Array_new(
-            newVariant.arrayDimensionsSize, 
-            &UA_TYPES[UA_TYPES_UINT32]
-        ));
-    for (size_t i = 0; i < newVariant.arrayDimensionsSize; ++i)
-        newVariant.arrayDimensions[i] = variant.arrayDimensions[i];
-
-    status = UA_Client_writeValueAttribute(client, node, &newVariant);
-
-    for (auto &bs : uaData) UA_ByteString_clear(&bs);
+    status = UA_Client_writeValueAttribute(client, node, &variant);
     UA_Variant_clear(&variant);
-    UA_Variant_clear(&newVariant);
 
     if (status == UA_STATUSCODE_GOOD) {
         return { true, 0 };

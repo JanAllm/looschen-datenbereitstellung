@@ -685,7 +685,11 @@ static void spsWorkerLoop(SettingsStore *settingsPtr, AppState *statePtr)
         spsController.writeInt16("StatusCode", 0);
 
         ErrorLoggerSingleton::instance().logError("SPS-Betriebsschleife startet");
-        ProjectManager projectManager(spsController, state, folderPath);
+        // sizeObjx/sizeObjy/lenDataArray MUST be passed on - without them the
+        // manager falls back to its defaults (block size 5!) and the block
+        // count written to the PLC has nothing to do with LenDataArray.
+        ProjectManager projectManager(spsController, state, folderPath,
+                                      sizeObjx, sizeObjy, lenDataArray);
 
         collectDiag(spsController);
         auto lastDiag = std::chrono::steady_clock::now();
@@ -723,7 +727,24 @@ static void spsWorkerLoop(SettingsStore *settingsPtr, AppState *statePtr)
 
         int16_t heartbeat = 0;
         auto lastBeat = std::chrono::steady_clock::now();
-    
+
+        // transferProjectData()/LiveImage() block this thread while waiting
+        // for the PLC handshake. This callback keeps the heartbeat running
+        // during those waits and aborts them on shutdown or dead link.
+        projectManager.setKeepAlive([&]() {
+            auto now = std::chrono::steady_clock::now();
+            if (now - lastBeat >= std::chrono::seconds(1))
+            {
+                auto [hbOk, hbEc] = spsController.writeInt16("Heartbeat", heartbeat++);
+                g_sps_connected.store(hbOk);
+                state.setSpsConnected(hbOk);
+                lastBeat = now;
+                if (!hbOk)
+                    return false;
+            }
+            return g_running.load() && !linkDown.load();
+        });
+
         while (g_running.load())
         {
             // Einstellungen geaendert? -> Verbindung neu aufbauen.

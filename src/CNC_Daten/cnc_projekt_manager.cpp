@@ -32,6 +32,11 @@ void ProjectManager::setDataArrayLength(int length)
     lenDataArray_ = length;
 }
 
+void ProjectManager::setKeepAlive(std::function<bool()> callback)
+{
+    keepAlive_ = std::move(callback);
+}
+
 // ========== PUBLIC METHODS ==========
 
 bool ProjectManager::updateProjectList(int maxProjects)
@@ -158,10 +163,29 @@ bool ProjectManager::transferProjectData()
 
         int currentBlock = 0;
 
+        // Without progress the wait below would block the shared SPS thread
+        // forever (no heartbeat, PLC watchdog trips). Abort when the PLC does
+        // not acknowledge a block for this long.
+        constexpr auto kHandshakeTimeout = std::chrono::seconds(30);
+        auto lastProgress = std::chrono::steady_clock::now();
+
         // 5. Blockweise übertragen
         while (true)
         {
             std::this_thread::sleep_for(std::chrono::milliseconds(10));
+
+            // Heartbeat weiterschreiben; bricht bei Shutdown/Verbindungsverlust ab.
+            if (keepAlive_ && !keepAlive_())
+            {
+                logAndPushError("Übertragung abgebrochen: Dienst wird beendet oder SPS-Verbindung verloren");
+                break;
+            }
+
+            if (std::chrono::steady_clock::now() - lastProgress > kHandshakeTimeout)
+            {
+                logAndPushError("Übertragung abgebrochen: SPS hat 30 s lang keinen Block angefordert (ReadData)");
+                break;
+            }
 
             // Abbruch prüfen
             auto [abbruch, succAbbruch, codeAbbruch] =
@@ -204,6 +228,7 @@ bool ProjectManager::transferProjectData()
 
                 controller_.writeBool("WriteData", true);
                 ++currentBlock;
+                lastProgress = std::chrono::steady_clock::now();
             }
 
             // Fertig?
@@ -380,6 +405,12 @@ std::tuple<int, bool> ProjectManager::LiveImage()
         while (true)
         {
             std::this_thread::sleep_for(std::chrono::milliseconds(10));
+
+            // Heartbeat weiterschreiben; bricht bei Shutdown/Verbindungsverlust ab.
+            if (keepAlive_ && !keepAlive_())
+            {
+                break;
+            }
 
             // Abbruch prüfen
             auto [abbruch, succAbbruch, codeAbbruch] =
