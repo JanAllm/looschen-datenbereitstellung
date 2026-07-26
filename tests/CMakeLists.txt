@@ -18,6 +18,8 @@ include(GoogleTest)
 
 # Test-Quellen finden
 file(GLOB_RECURSE TEST_SOURCES "${CMAKE_SOURCE_DIR}/tests/*.cpp")
+# Legacy test for the removed Python/Flask web server - its header no longer exists
+list(FILTER TEST_SOURCES EXCLUDE REGEX ".*/testWebServer\\.cpp$")
 
 # Test-Executable
 add_executable(MyCppTests ${TEST_SOURCES})
@@ -37,7 +39,6 @@ endif()
 # Includes
 target_include_directories(MyCppTests PRIVATE
     ${CMAKE_SOURCE_DIR}/include
-    ${Python3_INCLUDE_DIRS}
     ${OpenCV_INCLUDE_DIRS}
 )
 
@@ -46,7 +47,6 @@ target_link_libraries(MyCppTests
     PRIVATE MyCppLibrary
     PRIVATE gtest
     PRIVATE gtest_main
-    PRIVATE Python3::Python
     PRIVATE ${OpenCV_LIBRARIES}
 )
 
@@ -86,13 +86,6 @@ file(GLOB OpenCV_DLLS "${OpenCV_DIR}/x64/vc16/bin/*.dll")
 foreach(DLL ${OpenCV_DLLS})
     copy_to_tests("${DLL}")
 endforeach()
-
-# ────────────────────────────────
-# Python DLL kopieren
-# ────────────────────────────────
-get_filename_component(PYTHON_DLL_DIR "${Python3_EXECUTABLE}" DIRECTORY)
-set(PYTHON_DLL_PATH "${PYTHON_DLL_DIR}/python314.dll")
-copy_to_tests("${PYTHON_DLL_PATH}")
 
 # ────────────────────────────────
 # Ressourcen kopieren

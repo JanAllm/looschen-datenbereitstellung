@@ -3,6 +3,10 @@
 #include <vector>
 
 #include <opencv2/opencv.hpp>
+// OpenCV 5: contour/shape functions moved to the geometry module (not in opencv.hpp)
+#if CV_VERSION_MAJOR >= 5
+#include <opencv2/geometry.hpp>
+#endif
 
 #include "web/app_state.h"
 

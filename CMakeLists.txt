@@ -92,8 +92,14 @@ if(WIN32)
     set(OpenCV_DIR "D:/opencv/build")
     set(OpenCV_RUNTIME vc16)
 endif()
-find_package(OpenCV REQUIRED)
-message(STATUS "✓ OpenCV gefunden: ${OpenCV_VERSION}")
+# Only link the modules we use: the full OpenCV_LIBS would also pull in
+# opencv_viz, which fails to link unless VTK is installed (optional on Arch).
+# geometry (OpenCV 5's new home for the contour/shape functions) is OPTIONAL
+# because it does not exist on OpenCV 4 (Windows build).
+find_package(OpenCV REQUIRED
+    COMPONENTS core imgproc imgcodecs highgui
+    OPTIONAL_COMPONENTS geometry)
+message(STATUS "✓ OpenCV gefunden: ${OpenCV_VERSION} (Module: ${OpenCV_LIBS})")
 
 # ────────────────────────────────
 # open62541 (OPC UA)
