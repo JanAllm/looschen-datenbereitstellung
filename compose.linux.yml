@@ -1,0 +1,6 @@
+# Linux-Override: Host-Netzwerk, damit die SPS im LAN direkt erreichbar ist
+# und der Webserver auf <host>:5000 lauscht.
+#   docker compose -f docker-compose.yml -f compose.linux.yml up -d --build
+services:
+  datenbereitstellung:
+    network_mode: host

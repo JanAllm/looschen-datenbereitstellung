@@ -1,0 +1,71 @@
+# Build-Artefakte (WICHTIG!)
+build/
+.venv/
+*.o
+*.a
+*.so
+*.dll
+*.exe
+*.pdb
+*.lib
+
+# OpenCV (falls lokal)
+opencv/
+D:/opencv/
+
+# IDE & Editor
+.vs/
+.vscode/
+*.user
+*.suo
+*.sln.docstates
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+pip-log.txt
+*.egg-info/
+
+# Logs
+*.log
+
+# Andere große Dateien
+*.zip
+*.tar.gz
+*.rar
+*.7z
+*.iso
+
+# Third-party (falls vorhanden)
+third_party/open62541/build/
+third_party/*/build/
+
+# Modelle (falls groß)
+models/*.onnx
+models/*.pt
+models/*.h5
+
+# Dokumentation
+docs/
+*.md
+README.md
+
+# Nicht ins Image nötig (verschlankt Kontext + stabilisiert Build-Cache)
+Dockerfile
+.dockerignore
+docker-compose.yml
+compose.*.yml
+Anleitung.docx
+BeispielDatensatz/
+Libarys/
+cert.pem
+key.pem
+requirements.txt

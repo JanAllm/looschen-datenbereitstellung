@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Live Image</title>
+  <style>
+    html, body {
+      margin: 0; height: 100%;
+      background: #000;
+    }
+    body {
+      display: flex; align-items: center; justify-content: center;
+    }
+    img {
+      max-width: 100vw; max-height: 100vh; object-fit: contain;
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <img id="live-img" src="/img" alt="">
+
+  <script>
+    const img = document.getElementById('live-img');
+    setInterval(() => {
+      const temp = new Image();
+      temp.onload = () => { img.src = temp.src; };
+      temp.src = '/img?ts=' + Date.now();
+    }, 1000);
+  </script>
+</body>
+</html>

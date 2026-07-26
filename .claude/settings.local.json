@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(powershell -NoProfile -Command 'Get-CimInstance Win32_Process -Filter \"name='\\\\''python.exe'\\\\''\" | Where-Object { $_.CommandLine -like '\\\\''*run_local*'\\\\'' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force; '\\\\''gestoppt: '\\\\'' + $_.ProcessId }')",
+      "Bash(tail -20 /tmp/docker_build.log 2>/dev/null || echo \"log noch leer\")",
+      "Bash(MSYS_NO_PATHCONV=1 docker run --rm -v \"//d/Arbeit/Looschen_Datenbereitstellung:/src\" ubuntu:24.04 bash -c \"apt-get update -qq >/dev/null 2>&1 && apt-get install -y -qq cmake ninja-build gcc python3 >/dev/null 2>&1 && cmake -S /src/third_party/open62541 -B /tmp/o -G Ninja -DUA_ENABLE_AMALGAMATION=ON >/dev/null 2>&1 && ninja -C /tmp/o open62541-amalgamation >/dev/null 2>&1; echo '=== open62541.h Zeilen 260-315 ==='; sed -n '260,315p' /tmp/o/open62541.h\")",
+      "Bash(MSYS_NO_PATHCONV=1 docker run --rm -v \"//d/Arbeit/Looschen_Datenbereitstellung:/src\" ubuntu:24.04 bash -c \"apt-get update -qq >/dev/null 2>&1 && apt-get install -y -qq cmake ninja-build gcc python3 >/dev/null 2>&1 && cmake -S /src/third_party/open62541 -B /tmp/o -G Ninja -DUA_ENABLE_AMALGAMATION=ON >/dev/null 2>&1 && ninja -C /tmp/o open62541-amalgamation >/dev/null 2>&1; echo '=== HAVE_C11_ATOMICS Definition ==='; grep -n 'HAVE_C11_ATOMICS\\\\|UA_MULTITHREADING ' /tmp/o/open62541.h | head -30\")",
+      "Bash(MSYS_NO_PATHCONV=1 docker run --rm -v \"//d/Arbeit/Looschen_Datenbereitstellung:/src\" ubuntu:24.04 bash -c \"apt-get update -qq >/dev/null 2>&1 && apt-get install -y -qq cmake ninja-build gcc python3 >/dev/null 2>&1 && cmake -S /src/third_party/open62541 -B /tmp/o -G Ninja -DUA_ENABLE_AMALGAMATION=ON >/dev/null 2>&1 && ninja -C /tmp/o open62541-amalgamation >/dev/null 2>&1; echo '=== Zeilen 243-262 ==='; sed -n '243,262p' /tmp/o/open62541.h\")"
+    ]
+  }
+}

@@ -1,0 +1,19 @@
+# Deploy-Compose: zieht das fertige Image von Docker Hub (KEIN lokaler Build,
+# kein Quellcode nötig). Kombinieren mit dem plattformspezifischen Override:
+#   Windows: docker compose -f compose.deploy.yml -f compose.windows.yml up -d
+#   Linux:   docker compose -f compose.deploy.yml -f compose.linux.yml up -d
+#
+# PROJECT_FOLDER = Host-Pfad des Projektordners, der nach /data/projects
+# gemountet wird. Ohne Angabe wird ./BeispielDatensatz verwendet.
+services:
+  datenbereitstellung:
+    image: janallm/looschen-datenbereitstellung:latest
+    container_name: looschen-datenbereitstellung
+    restart: unless-stopped
+    volumes:
+      # Persistente Settings-DB (SQLite) - überlebt Container-Neustarts.
+      - ./data:/app/data
+      # Projektordner (Host -> Container), nur lesend.
+      # Standard: der mitgelieferte Testdatensatz. Für echte Projekte
+      # PROJECT_FOLDER auf den Host-Ordner setzen.
+      - ${PROJECT_FOLDER:-./BeispielDatensatz}:/data/projects:ro

@@ -1,0 +1,20 @@
+# Basis-Compose. Kombinieren mit einem plattformspezifischen Override:
+#   Linux:   docker compose -f docker-compose.yml -f compose.linux.yml up -d --build
+#   Windows: docker compose -f docker-compose.yml -f compose.windows.yml up -d --build
+#
+# PROJECT_FOLDER = Host-Pfad des (festen) Projektordners, der nach
+# /data/projects gemountet wird. Ohne Angabe wird ./projekte verwendet.
+services:
+  datenbereitstellung:
+    build:
+      context: .
+    image: looschen-datenbereitstellung:latest
+    container_name: looschen-datenbereitstellung
+    restart: unless-stopped
+    volumes:
+      # Persistente Settings-DB (SQLite) - überlebt Container-Neustarts.
+      - ./data:/app/data
+      # Fester Projektordner (Host -> Container), nur lesend.
+      # Standard: der mitgelieferte Testdatensatz. Für echte Projekte
+      # PROJECT_FOLDER auf den Host-Ordner setzen.
+      - ${PROJECT_FOLDER:-./BeispielDatensatz}:/data/projects:ro

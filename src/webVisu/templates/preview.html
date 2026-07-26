@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Datenbereitstellung – Vorschau (ohne SPS)</title>
+  <style>
+    :root { color-scheme: light dark; }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+           background: #f4f5f7; color: #1a1a1a; }
+    header { display: flex; align-items: center; justify-content: space-between;
+             padding: 12px 20px; background: #1f2937; color: #fff; }
+    header h1 { font-size: 1rem; margin: 0; font-weight: 600; }
+    header a { color: #fff; text-decoration: none; font-size: .9rem;
+               border: 1px solid rgba(255,255,255,.4); padding: 6px 12px; border-radius: 6px; }
+    header a:hover { background: rgba(255,255,255,.12); }
+    main { max-width: 1040px; margin: 0 auto; padding: 20px; display: grid;
+           grid-template-columns: 380px 1fr; gap: 20px; }
+    @media (max-width: 780px){ main { grid-template-columns: 1fr; } }
+    .panel { background: #fff; border: 1px solid #d0d5dd; border-radius: 10px; padding: 16px; margin-bottom: 16px; }
+    .panel h2 { font-size: .95rem; margin: 0 0 12px; color: #374151; }
+    label { display: block; font-size: .85rem; color: #374151; margin: 10px 0 4px; }
+    select, input[type=text], input[type=number] {
+        width: 100%; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 6px;
+        font-size: .9rem; background: #fff; color: #111; }
+    .btns { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+    button { background: #2563eb; color: #fff; border: 0; border-radius: 8px;
+             padding: 9px 14px; font-size: .9rem; font-weight: 600; cursor: pointer; }
+    button.secondary { background: #6b7280; }
+    button.danger { background: #dc2626; }
+    #status { margin-top: 12px; font-size: .85rem; color: #2563eb; min-height: 1.2em; }
+    .imgwrap { background: #000; border-radius: 10px; position: relative;
+               overflow: hidden; height: 82vh; min-height: 480px; touch-action: none; }
+    .imgwrap img { position: absolute; top: 0; left: 0; transform-origin: 0 0;
+                   cursor: grab; user-select: none; -webkit-user-drag: none; }
+    .imgwrap img.grabbing { cursor: grabbing; }
+    .zoomhint { position: absolute; bottom: 8px; left: 10px; color: #cbd5e1;
+                font-size: .75rem; background: rgba(0,0,0,.45); padding: 3px 8px;
+                border-radius: 6px; pointer-events: none; }
+    ul.projects { list-style: none; margin: 10px 0 0; padding: 0; max-height: 150px;
+                  overflow: auto; border: 1px solid #eee; border-radius: 6px; }
+    ul.projects li { padding: 6px 10px; font-size: .85rem; border-bottom: 1px solid #f1f1f1; cursor: pointer; }
+    ul.projects li:hover { background: #eff6ff; }
+    ul.projects li.sel { background: #dbeafe; font-weight: 600; }
+    .hint { font-size: .8rem; color: #6b7280; margin: 4px 0 0; }
+    /* Farb-Legende / -Editor */
+    .legend { margin: 4px 0 0; }
+    .legrow { display: flex; align-items: center; gap: 10px; margin: 7px 0; }
+    .legrow input[type=color] { width: 38px; height: 28px; padding: 0; border: 1px solid #cbd5e1;
+                                border-radius: 5px; background: none; cursor: pointer; flex: 0 0 auto; }
+    .legrow .lbl { font-size: .85rem; color: #374151; }
+    .legrow .lbl b { color: #111; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Vorschau – ohne SPS</h1>
+    <a href="/settings">⚙ Einstellungen</a>
+  </header>
+  <main>
+    <div>
+      <div class="panel">
+        <h2>Projekt</h2>
+        <label for="folder">Projektordner</label>
+        <input id="folder" type="text" readonly>
+        <label for="project">Projekt auswählen</label>
+        <select id="project"></select>
+        <ul class="projects" id="projectList"></ul>
+        <div class="btns">
+          <button id="btnReload" class="secondary" type="button">Liste aktualisieren</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>Darstellung</h2>
+        <div class="legend" id="legend">
+          <div class="legrow"><input type="color" id="colG0"><span class="lbl"><b>G0</b> – Eilgang</span></div>
+          <div class="legrow"><input type="color" id="colG1"><span class="lbl"><b>G1</b> – Linear</span></div>
+          <div class="legrow"><input type="color" id="colG2"><span class="lbl"><b>G2</b> – Kreis im Uhrzeigersinn</span></div>
+          <div class="legrow"><input type="color" id="colG3"><span class="lbl"><b>G3</b> – Kreis gegen Uhrzeigersinn</span></div>
+          <div class="legrow"><input type="color" id="colLive"><span class="lbl"><b>Aktuell</b> – Position im Testlauf/SPS</span></div>
+          <div class="legrow"><input type="color" id="colDone"><span class="lbl"><b>Erledigt</b> – bereits abgearbeitet</span></div>
+        </div>
+        <label for="radius">Bogenglättung-Radius (mm) – 0 = aus</label>
+        <input id="radius" type="number" step="0.1" min="0" value="0">
+        <label>Strichstärke Fortschritt – aktuell / erledigt (0 = normal)</label>
+        <div style="display:flex; gap:8px;">
+          <input id="liveThick" type="number" min="1" max="10" value="3" title="Aktuelle Position">
+          <input id="doneThick" type="number" min="0" max="10" value="0" title="Erledigt (0 = normale Stärke)">
+        </div>
+        <div class="btns">
+          <button id="btnRender" type="button">Jetzt rendern</button>
+        </div>
+        <p class="hint">Farben &amp; Radius gelten sofort für die Vorschau – ohne SPS.</p>
+      </div>
+
+      <div class="panel">
+        <h2>Testdurchlauf</h2>
+        <label for="interval">Zeitabstand pro Schritt (ms) – 0 = schnellstmöglich</label>
+        <input id="interval" type="number" value="100" min="0" max="60000">
+        <div class="btns">
+          <button id="btnRun" type="button">Testdurchlauf starten</button>
+          <button id="btnStop" class="danger" type="button">Stop</button>
+        </div>
+        <div id="status"></div>
+      </div>
+    </div>
+
+    <div class="imgwrap" id="imgwrap">
+      <img id="img" src="/img" alt="">
+      <div class="zoomhint">Mausrad: Zoom · Ziehen: Verschieben · Doppelklick: Zurücksetzen</div>
+    </div>
+  </main>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const statusEl = $('status');
+    let statusTimer = null;
+
+    function setStatus(msg, err) { statusEl.textContent = msg; statusEl.style.color = err ? '#dc2626' : '#2563eb'; }
+    function refreshImg() { $('img').src = '/img?ts=' + Date.now(); }
+
+    // ---- Farb-Konvertierung "r,g,b" <-> "#rrggbb" ----
+    function rgbToHex(s) {
+      const p = (s || '').split(',').map(x => Math.max(0, Math.min(255, parseInt(x, 10) || 0)));
+      while (p.length < 3) p.push(0);
+      return '#' + p.slice(0, 3).map(v => v.toString(16).padStart(2, '0')).join('');
+    }
+    function hexToRgb(h) {
+      const m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(h || '');
+      if (!m) return '0,0,0';
+      return [1, 2, 3].map(i => parseInt(m[i], 16)).join(',');
+    }
+
+    async function loadProjects() {
+      setStatus('Lade Projektliste …');
+      try {
+        const res = await fetch('/api/projects');
+        const data = await res.json();
+        $('folder').value = data.folder || '(kein Ordner gesetzt)';
+        const sel = $('project'); sel.innerHTML = '';
+        const list = $('projectList'); list.innerHTML = '';
+        (data.projects || []).forEach(name => {
+          const o = document.createElement('option'); o.value = name; o.textContent = name; sel.appendChild(o);
+          const li = document.createElement('li'); li.textContent = name;
+          li.onclick = () => { sel.value = name; markSel(); };
+          list.appendChild(li);
+        });
+        markSel();
+        setStatus((data.projects || []).length + ' Projekt(e) gefunden.');
+      } catch (e) { setStatus('Fehler beim Laden: ' + e, true); }
+    }
+
+    function markSel() {
+      const v = $('project').value;
+      [...$('projectList').children].forEach(li => li.classList.toggle('sel', li.textContent === v));
+    }
+
+    async function loadRenderParams() {
+      try {
+        const p = await (await fetch('/api/render_params')).json();
+        $('colG0').value = rgbToHex(p.colorG0); $('colG1').value = rgbToHex(p.colorG1);
+        $('colG2').value = rgbToHex(p.colorG2); $('colG3').value = rgbToHex(p.colorG3);
+        $('colLive').value = rgbToHex(p.liveColor); $('colDone').value = rgbToHex(p.doneColor);
+        $('liveThick').value = p.liveThickness || '3'; $('doneThick').value = p.doneThickness || '0';
+        $('radius').value = p.minArcRadius || '0';
+      } catch (e) { /* Defaults belassen */ }
+    }
+
+    // Darstellungs-Werte in die Settings-DB speichern (wirkt sofort, kein Neustart).
+    async function saveRenderParams() {
+      const payload = {
+        previewColorG0: hexToRgb($('colG0').value), previewColorG1: hexToRgb($('colG1').value),
+        previewColorG2: hexToRgb($('colG2').value), previewColorG3: hexToRgb($('colG3').value),
+        previewLiveColor: hexToRgb($('colLive').value), previewDoneColor: hexToRgb($('colDone').value),
+        previewLiveThickness: ($('liveThick').value || '3'), previewDoneThickness: ($('doneThick').value || '0'),
+        previewMinArcRadius: ($('radius').value || '0')
+      };
+      await fetch('/api/settings', { method: 'PUT', headers: {'Content-Type':'application/json'},
+                                     body: JSON.stringify(payload) });
+    }
+
+    async function post(url, body) {
+      const res = await fetch(url, { method: 'POST', headers: {'Content-Type':'application/json'},
+                                     body: JSON.stringify(body || {}) });
+      if (!res.ok) throw new Error('HTTP ' + res.status + ' ' + (await res.text()));
+      return res.json();
+    }
+
+    async function currentGen() {
+      try { const s = await (await fetch('/api/preview/status')).json(); return s.gen || 0; }
+      catch (e) { return 0; }
+    }
+
+    async function render() {
+      const p = $('project').value; if (!p) return setStatus('Kein Projekt gewählt.', true);
+      setStatus('Übernehme Darstellung & rendere …');
+      try { const gen0 = await currentGen(); await saveRenderParams();
+            await post('/api/preview/full', { project: p }); awaitJob(gen0, 'Gerendert'); }
+      catch (e) { setStatus('Fehler: ' + e, true); }
+    }
+
+    async function startRun() {
+      const p = $('project').value; if (!p) return setStatus('Kein Projekt gewählt.', true);
+      const iv = parseInt($('interval').value, 10); const interval = isNaN(iv) ? 100 : iv;
+      setStatus('Übernehme Darstellung & starte Testdurchlauf …');
+      try { const gen0 = await currentGen(); await saveRenderParams();
+            await post('/api/preview/testrun', { project: p, interval_ms: interval });
+            awaitJob(gen0, 'Testdurchlauf beendet'); }
+      catch (e) { setStatus('Fehler: ' + e, true); }
+    }
+
+    async function stopRun() {
+      try { await post('/api/preview/stop'); } catch (e) { setStatus('Fehler: ' + e, true); }
+    }
+
+    // Wartet über den Generations-Zähler zuverlässig auf das Auftragsende -
+    // funktioniert auch, wenn der Render schneller als ein Poll-Intervall ist.
+    function awaitJob(gen0, doneMsg) {
+      if (statusTimer) clearInterval(statusTimer);
+      let tick = 0;
+      statusTimer = setInterval(async () => {
+        refreshImg();                 // Bild flüssig (~11/s) aktualisieren
+        if ((++tick) % 2 !== 0) return; // Status nur jeden 2. Tick (~180ms)
+        try {
+          const s = await (await fetch('/api/preview/status')).json();
+          const started = (s.gen || 0) > gen0;
+          if (started && s.running) {
+            setStatus('Läuft: Schritt ' + s.step + ' / ' + s.total);
+          } else if (started && !s.running) {
+            clearInterval(statusTimer); statusTimer = null; refreshImg();
+            setStatus((doneMsg || 'Fertig') + ' (' + s.step + ' / ' + s.total + ').');
+          }
+          // sonst: Worker hat den Befehl noch nicht übernommen -> weiter warten
+        } catch (e) { clearInterval(statusTimer); statusTimer = null; }
+      }, 90);
+    }
+
+    // ---- Zoom & Verschieben des Vorschaubilds ----
+    (function () {
+      const wrap = $('imgwrap'), img = $('img');
+      let scale = 1, tx = 0, ty = 0, fitted = false, dragging = false, sx = 0, sy = 0;
+      const apply = () => { img.style.transform = `translate(${tx}px,${ty}px) scale(${scale})`; };
+      function fit() {
+        const w = wrap.clientWidth, h = wrap.clientHeight;
+        const iw = img.naturalWidth || 500, ih = img.naturalHeight || 1000;
+        scale = Math.min(w / iw, h / ih);
+        tx = (w - iw * scale) / 2; ty = (h - ih * scale) / 2; apply();
+      }
+      // Nur beim ERSTEN Laden einpassen - Frame-Updates (gleiche Größe) sollen den Zoom behalten.
+      img.addEventListener('load', () => { if (!fitted) { fit(); fitted = true; } });
+      if (img.complete && img.naturalWidth) { fit(); fitted = true; }
+
+      wrap.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        const r = wrap.getBoundingClientRect();
+        const mx = e.clientX - r.left, my = e.clientY - r.top;
+        const f = e.deltaY < 0 ? 1.15 : 1 / 1.15;
+        const ns = Math.min(40, Math.max(0.05, scale * f));
+        tx = mx - (mx - tx) * (ns / scale);
+        ty = my - (my - ty) * (ns / scale);
+        scale = ns; apply();
+      }, { passive: false });
+
+      wrap.addEventListener('pointerdown', (e) => {
+        dragging = true; sx = e.clientX - tx; sy = e.clientY - ty;
+        img.classList.add('grabbing'); wrap.setPointerCapture(e.pointerId);
+      });
+      wrap.addEventListener('pointermove', (e) => {
+        if (!dragging) return; tx = e.clientX - sx; ty = e.clientY - sy; apply();
+      });
+      const endDrag = () => { dragging = false; img.classList.remove('grabbing'); };
+      wrap.addEventListener('pointerup', endDrag);
+      wrap.addEventListener('pointercancel', endDrag);
+      wrap.addEventListener('dblclick', fit);
+      window.addEventListener('resize', () => { if (fitted) fit(); });
+    })();
+
+    $('btnReload').onclick = loadProjects;
+    $('project').onchange = markSel;
+    $('btnRender').onclick = render;
+    $('btnRun').onclick = startRun;
+    $('btnStop').onclick = stopRun;
+    loadProjects();
+    loadRenderParams();
+  </script>
+</body>
+</html>

@@ -1,0 +1,7 @@
+# Schlanke Python-Runtime für den aktiven Datenbereitstellungs-Pfad (Docker).
+# Bewusst OHNE torch / easyocr / pyzbar / opencv-python - die gehören zum
+# inaktiven Bildverarbeitungs-Zweig und werden vom Dienst nicht benötigt.
+Flask>=3.0
+Pillow>=10.0
+cryptography>=42.0
+numpy>=1.26

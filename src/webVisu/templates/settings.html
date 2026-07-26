@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Datenbereitstellung – Einstellungen</title>
+  <style>
+    :root { color-scheme: light dark; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      background: #f4f5f7; color: #1a1a1a;
+    }
+    header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 12px 20px; background: #1f2937; color: #fff;
+    }
+    header h1 { font-size: 1rem; margin: 0; font-weight: 600; }
+    header a {
+      color: #fff; text-decoration: none; font-size: .9rem;
+      border: 1px solid rgba(255,255,255,.4); padding: 6px 12px; border-radius: 6px;
+    }
+    header a:hover { background: rgba(255,255,255,.12); }
+    .sps { font-size: .85rem; padding: 5px 12px; border-radius: 999px; font-weight: 600;
+           display: inline-flex; align-items: center; gap: 6px; }
+    .sps::before { content: '●'; font-size: .8em; }
+    .sps-on { background: #064e3b; color: #6ee7b7; }
+    .sps-off { background: #7f1d1d; color: #fca5a5; }
+    .sps-unknown { background: #374151; color: #d1d5db; }
+    main { max-width: 760px; margin: 0 auto; padding: 24px 20px 60px; }
+    .category {
+      font-size: 1.15rem; font-weight: 700; color: #111827;
+      margin: 26px 0 12px; padding-bottom: 6px; border-bottom: 2px solid #2563eb;
+    }
+    .category:first-child { margin-top: 4px; }
+    .group {
+      border: 1px solid #d0d5dd; border-radius: 10px; margin: 0 0 16px;
+      background: #fff; overflow: hidden;
+    }
+    .group > summary {
+      font-weight: 600; padding: 14px 18px; color: #374151; cursor: pointer;
+      list-style: none; user-select: none; background: #fafbfc;
+    }
+    .group > summary::-webkit-details-marker { display: none; }
+    .group > summary::before { content: '▸ '; color: #9ca3af; }
+    .group[open] > summary::before { content: '▾ '; }
+    .group .body { padding: 8px 18px 16px; }
+    .row { display: flex; align-items: center; gap: 10px; margin: 8px 0; }
+    .row label { flex: 0 0 290px; font-size: .9rem; color: #374151; display: flex; align-items: center; gap: 6px; }
+    .row input {
+      flex: 1; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 6px;
+      font-size: .9rem; background: #fff; color: #111;
+    }
+    .row input:focus { outline: 2px solid #2563eb; border-color: #2563eb; }
+    .help {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 16px; height: 16px; border-radius: 50%; background: #e5e7eb;
+      color: #4b5563; font-size: 11px; font-weight: 700; cursor: pointer; flex: 0 0 auto;
+      border: 0;
+    }
+    .help:hover { background: #2563eb; color: #fff; }
+    #popover {
+      position: absolute; z-index: 1000; max-width: 300px;
+      background: #111827; color: #f9fafb; border-radius: 8px;
+      padding: 10px 12px; font-size: .82rem; line-height: 1.4;
+      box-shadow: 0 6px 24px rgba(0,0,0,.28); display: none;
+    }
+    #popover.show { display: block; }
+    #popover .pk { font-weight: 700; color: #93c5fd; display: block; margin-bottom: 2px; }
+    #popover .pt { color: #d1d5db; font-style: italic; display: block; margin-bottom: 6px; }
+    #popover::after {
+      content: ''; position: absolute; top: -6px; left: 14px;
+      border: 6px solid transparent; border-top: 0; border-bottom-color: #111827;
+    }
+    .actions { position: sticky; bottom: 0; padding: 16px 0; background: linear-gradient(transparent, #f4f5f7 30%); }
+    button {
+      background: #2563eb; color: #fff; border: 0; border-radius: 8px;
+      padding: 11px 22px; font-size: .95rem; font-weight: 600; cursor: pointer;
+    }
+    button:disabled { opacity: .6; cursor: default; }
+    #status { margin-left: 14px; font-size: .9rem; }
+    .ok { color: #059669; } .err { color: #dc2626; } .info { color: #2563eb; }
+    .hint { font-size: .8rem; color: #6b7280; margin: 2px 0 14px; }
+
+    /* Knoten-Diagnose */
+    #diagBox { margin: 0 0 18px; padding: 12px 16px; border: 1px solid #d0d5dd;
+               border-radius: 10px; background: #fff; }
+    #diagBox > summary { cursor: pointer; font-weight: 600; color: #374151; }
+    #diagWrap { max-height: 320px; overflow: auto; margin-top: 8px; }
+    #diagTable { width: 100%; border-collapse: collapse; font-size: .82rem; }
+    #diagTable th, #diagTable td { text-align: left; padding: 5px 8px;
+                                   border-bottom: 1px solid #e5e7eb; white-space: nowrap; }
+    #diagTable th { position: sticky; top: 0; background: #f3f4f6; color: #374151; }
+    #diagTable code { font-size: .95em; color: #374151; }
+    .badge { display: inline-block; padding: 1px 8px; border-radius: 999px;
+             font-size: .75rem; font-weight: 600; }
+    .b-ok   { background: #d1fae5; color: #065f46; }
+    .b-bad  { background: #fee2e2; color: #991b1b; }
+    .b-none { background: #e5e7eb; color: #6b7280; }
+    tr.row-missing td { background: #fef2f2; }
+    #opsPanel { border: 1px solid #d0d5dd; border-radius: 10px; background: #fff;
+                margin: 0 0 18px; overflow: hidden; }
+    .ops-row { display: flex; align-items: center; justify-content: space-between;
+               gap: 16px; padding: 12px 16px; border-bottom: 1px solid #eef0f3; }
+    .ops-row:last-child { border-bottom: 0; }
+    .ops-title { font-weight: 600; color: #374151; font-size: .95rem; }
+    .ops-sub { font-size: .78rem; color: #6b7280; margin-top: 2px; }
+    .ops-btn { min-width: 132px; padding: 9px 16px; font-size: .9rem; }
+    .ops-on  { background: #dc2626; }
+    .ops-off { background: #059669; }
+    .nodestat { flex: 0 0 130px; text-align: right; font-size: .75rem; }
+    .nodestat .badge + .badge { margin-left: 4px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Einstellungen</h1>
+    <div style="display:flex; align-items:center; gap:14px;">
+      <span id="spsStatus" class="sps sps-unknown">SPS: —</span>
+      <a href="/preview">▷ Vorschau</a>
+    </div>
+  </header>
+  <main>
+    <p class="hint">Änderungen werden <strong>sofort übernommen</strong> – kein Neustart nötig.
+       Bei Änderungen an SPS-Verbindung oder Knoten-Indizes baut der Dienst die
+       OPC-Verbindung automatisch neu auf.</p>
+
+    <div id="opsPanel">
+      <div class="ops-row">
+        <div>
+          <div class="ops-title">SPS-Verbindung</div>
+          <div class="ops-sub" id="opcSub">–</div>
+        </div>
+        <button type="button" class="ops-btn" id="opcBtn" data-key="opcEnabled">…</button>
+      </div>
+      <div class="ops-row">
+        <div>
+          <div class="ops-title">Datenaustausch</div>
+          <div class="ops-sub" id="dataSub">Projektübertragung, Projektliste, Live-Bild (Heartbeat läuft weiter)</div>
+        </div>
+        <button type="button" class="ops-btn" id="dataBtn" data-key="dataExchangeEnabled">…</button>
+      </div>
+    </div>
+
+    <details id="diagBox" open>
+      <summary><strong>OPC-Knoten – Live-Diagnose</strong> <span id="diagSummary" class="hint"></span></summary>
+      <p class="hint">Zeigt für jeden konfigurierten Knoten, ob er auf der SPS existiert und
+         ob er laut Server les-/schreibbar ist (AccessLevel-Attribut – es wird nichts geschrieben).</p>
+      <div id="diagWrap"><p class="hint">Lade …</p></div>
+    </details>
+
+    <form id="form"><div id="groups">Lade …</div></form>
+  <div id="popover"></div>
+    <div class="actions">
+      <button id="save" type="button" disabled>Speichern &amp; Übernehmen</button>
+      <span id="status"></span>
+    </div>
+  </main>
+
+  <script>
+    const groupsEl = document.getElementById('groups');
+    const saveBtn = document.getElementById('save');
+    const statusEl = document.getElementById('status');
+    let allKeys = [];
+    // Werte, wie sie beim Laden der Seite vom Server kamen. Nur Felder, die
+    // davon abweichen, werden gespeichert - sonst wuerde eine veraltete Seite
+    // zwischenzeitliche Aenderungen (auch von anderen Stellen) ueberschreiben.
+    let loadedValues = {};
+
+    function setStatus(msg, cls) { statusEl.textContent = msg; statusEl.className = cls || ''; }
+
+    async function load() {
+      try {
+        const res = await fetch('/api/settings');
+        const data = await res.json();
+        render(data.groups || []);
+        for (const g of (data.groups || [])) {
+          for (const f of g.fields) {
+            if (f.key in opsState) opsState[f.key] = f.value;
+          }
+        }
+        renderOps();
+        saveBtn.disabled = false;
+      } catch (e) {
+        groupsEl.textContent = 'Fehler beim Laden der Einstellungen: ' + e;
+      }
+    }
+
+    function render(groups) {
+      groupsEl.innerHTML = '';
+      allKeys = [];
+      loadedValues = {};
+      let currentCat = null;
+      for (const g of groups) {
+        if (g.category && g.category !== currentCat) {
+          currentCat = g.category;
+          const h = document.createElement('div');
+          h.className = 'category';
+          h.textContent = currentCat;
+          groupsEl.appendChild(h);
+        }
+        groupsEl.appendChild(groupEl(g));
+      }
+    }
+
+    function groupEl(g) {
+      const det = document.createElement('details');
+      det.className = 'group';
+      if (g.open) det.open = true;
+      const sum = document.createElement('summary');
+      sum.textContent = g.name;
+      det.appendChild(sum);
+      const body = document.createElement('div'); body.className = 'body';
+      for (const f of g.fields) { body.appendChild(rowEl(f, g.category)); allKeys.push(f.key); }
+      det.appendChild(body);
+      return det;
+    }
+
+    function rowEl(f, category) {
+      const row = document.createElement('div'); row.className = 'row';
+      const lab = document.createElement('label'); lab.htmlFor = 'f_' + f.key;
+      lab.appendChild(document.createTextNode(f.label + ' '));
+      const help = document.createElement('button');
+      help.type = 'button'; help.className = 'help'; help.textContent = '?';
+      help.setAttribute('aria-label', 'Hilfe zu ' + f.label);
+      help.addEventListener('click', (ev) => {
+        ev.preventDefault(); ev.stopPropagation();
+        showPopover(help, f);
+      });
+      lab.appendChild(help);
+      const inp = document.createElement('input');
+      inp.id = 'f_' + f.key; inp.name = f.key; inp.value = f.value;
+      loadedValues[f.key] = f.value;
+      inp.type = f.type === 'int' ? 'number' : 'text';
+      row.appendChild(lab); row.appendChild(inp);
+
+      // Bei OPC-Knoten direkt anzeigen, ob der Knoten auf der SPS verfuegbar ist.
+      // 'ns' ist selbst kein Knoten -> keine Anzeige.
+      if (category === 'OPC-Knoten' && f.key !== 'ns') {
+        const st = document.createElement('span');
+        st.className = 'nodestat';
+        st.dataset.key = f.key;
+        st.innerHTML = '<span class="badge b-none">–</span>';
+        row.appendChild(st);
+      }
+      return row;
+    }
+
+    // ---- Popover (Klick auf ?) ----
+    const popover = document.getElementById('popover');
+    let popoverAnchor = null;
+
+    function showPopover(anchor, f) {
+      if (popoverAnchor === anchor && popover.classList.contains('show')) {
+        hidePopover(); return;                 // gleiches ? erneut -> schließen
+      }
+      popover.innerHTML = '';
+      const pk = document.createElement('span'); pk.className = 'pk'; pk.textContent = f.label;
+      const pt = document.createElement('span'); pt.className = 'pt'; pt.textContent = 'Typ: ' + (f.typehint || '–');
+      const pd = document.createElement('span'); pd.textContent = f.help || 'Keine Beschreibung.';
+      popover.appendChild(pk); popover.appendChild(pt); popover.appendChild(pd);
+
+      popover.classList.add('show');
+      const r = anchor.getBoundingClientRect();
+      let left = window.scrollX + r.left;
+      const top = window.scrollY + r.bottom + 8;
+      // Rechten Rand nicht überschreiten.
+      const maxLeft = window.scrollX + document.documentElement.clientWidth - popover.offsetWidth - 10;
+      if (left > maxLeft) left = Math.max(window.scrollX + 8, maxLeft);
+      popover.style.left = left + 'px';
+      popover.style.top = top + 'px';
+      popoverAnchor = anchor;
+    }
+
+    function hidePopover() {
+      popover.classList.remove('show');
+      popoverAnchor = null;
+    }
+
+    document.addEventListener('click', (ev) => {
+      if (ev.target !== popover && !popover.contains(ev.target)) hidePopover();
+    });
+    document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape') hidePopover(); });
+    window.addEventListener('resize', hidePopover);
+
+    async function save() {
+      saveBtn.disabled = true;
+      setStatus('Speichere …', 'info');
+      const payload = {};
+      for (const key of allKeys) {
+        const el = document.getElementById('f_' + key);
+        if (el && el.value !== loadedValues[key]) payload[key] = el.value;
+      }
+      if (Object.keys(payload).length === 0) {
+        setStatus('Keine Änderungen zu speichern.', 'info');
+        saveBtn.disabled = false;
+        return;
+      }
+      try {
+        const res = await fetch('/api/settings', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const data = await res.json().catch(() => ({}));
+        if (data.restart) {
+          setStatus('Gespeichert – Dienst startet neu …', 'ok');
+          setTimeout(() => { window.location.href = '/'; }, 8000);
+        } else {
+          const n = Object.keys(payload).length;
+          setStatus('Gespeichert (' + n + ' geändert). Wird sofort übernommen.', 'ok');
+          saveBtn.disabled = false;
+          load();   // frisch laden: Seite bleibt auf aktuellem Stand
+        }
+      } catch (e) {
+        setStatus('Fehler: ' + e, 'err');
+        saveBtn.disabled = false;
+      }
+    }
+
+    saveBtn.addEventListener('click', save);
+    load();
+
+    // SPS-Verbindungsstatus anzeigen (pollt den vom C++-Dienst gemeldeten Zustand).
+    const spsEl = document.getElementById('spsStatus');
+    // ---- Betriebsschalter (Start/Stop) ----
+    let opsState = { opcEnabled: null, dataExchangeEnabled: null };
+
+    function renderOps() {
+      const map = [['opcBtn', 'opcEnabled'], ['dataBtn', 'dataExchangeEnabled']];
+      for (const [id, key] of map) {
+        const b = document.getElementById(id);
+        if (!b) continue;
+        const on = opsState[key] === '1';
+        b.textContent = on ? '■ Stoppen' : '▶ Starten';
+        b.className = 'ops-btn ' + (on ? 'ops-on' : 'ops-off');
+      }
+      const sub = document.getElementById('opcSub');
+      if (sub) {
+        sub.textContent = opsState.opcEnabled === '1'
+          ? 'Verbindung zur SPS aktiv (Weboberfläche bleibt immer erreichbar)'
+          : 'Verbindung getrennt – es wird nicht neu verbunden';
+      }
+    }
+
+    async function toggleOps(key) {
+      const next = opsState[key] === '1' ? '0' : '1';
+      const body = {}; body[key] = next;
+      try {
+        await fetch('/api/settings', { method: 'PUT',
+          headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+        opsState[key] = next;
+        renderOps();
+        setStatus(key === 'opcEnabled'
+          ? (next === '1' ? 'SPS-Verbindung gestartet.' : 'SPS-Verbindung gestoppt.')
+          : (next === '1' ? 'Datenaustausch gestartet.' : 'Datenaustausch gestoppt.'), 'ok');
+      } catch (e) { setStatus('Umschalten fehlgeschlagen: ' + e, 'err'); }
+    }
+
+    document.getElementById('opcBtn').addEventListener('click', () => toggleOps('opcEnabled'));
+    document.getElementById('dataBtn').addEventListener('click', () => toggleOps('dataExchangeEnabled'));
+
+    // ---- Live-Diagnose der OPC-Knoten ----
+    function badge(ok, textOk, textBad) {
+      return '<span class="badge ' + (ok ? 'b-ok' : 'b-bad') + '">' +
+             (ok ? textOk : textBad) + '</span>';
+    }
+
+    async function pollNodes() {
+      const wrap = document.getElementById('diagWrap');
+      const sum = document.getElementById('diagSummary');
+      try {
+        const d = await (await fetch('/api/opc_nodes')).json();
+        const nodes = d.nodes || [];
+        if (!nodes.length) {
+          updateInlineStatus([]);   // sonst bleiben alte gruene Anzeigen stehen
+          sum.textContent = d.connected ? '' : '– keine Verbindung';
+          wrap.innerHTML = '<p class="hint">' +
+            (d.message ? d.message : 'Noch keine Knoten geprüft.') + '</p>';
+          return;
+        }
+        const missing = nodes.filter(n => !n.exists).length;
+        sum.innerHTML = missing
+          ? '<span class="badge b-bad">' + missing + ' fehlend</span> von ' + nodes.length
+          : '<span class="badge b-ok">alle ' + nodes.length + ' vorhanden</span>';
+        let html = '<table id="diagTable"><thead><tr>' +
+          '<th>Knoten</th><th>NodeId</th><th>Typ</th>' +
+          '<th>vorhanden</th><th>lesbar</th><th>schreibbar</th></tr></thead><tbody>';
+        for (const n of nodes) {
+          html += '<tr class="' + (n.exists ? '' : 'row-missing') + '">' +
+            '<td>' + n.name + '</td>' +
+            '<td><code>' + n.nodeId + '</code></td>' +
+            '<td>' + n.type + '</td>' +
+            '<td>' + badge(n.exists, 'ja', 'FEHLT') + '</td>' +
+            '<td>' + (n.exists ? badge(n.readable, 'ja', 'nein')
+                               : '<span class="badge b-none">–</span>') + '</td>' +
+            '<td>' + (n.exists ? badge(n.writable, 'ja', 'nein')
+                               : '<span class="badge b-none">–</span>') + '</td>' +
+            '</tr>';
+        }
+        wrap.innerHTML = html + '</tbody></table>';
+        updateInlineStatus(nodes);
+      } catch (e) {
+        wrap.innerHTML = '<p class="hint">Diagnose nicht abrufbar.</p>';
+      }
+    }
+
+    // Ordnet die Diagnose ueber die NodeId dem jeweiligen Eingabefeld zu:
+    // NodeId = "ns=<ns>;i=<Feldwert>". Dadurch ist keine zusaetzliche
+    // Zuordnungstabelle im Backend noetig.
+    function updateInlineStatus(nodes) {
+      const byId = {};
+      for (const n of nodes) byId[n.nodeId] = n;
+      const nsInput = document.getElementById('f_ns');
+      const ns = nsInput ? nsInput.value.trim() : '1';
+      for (const el of document.querySelectorAll('.nodestat')) {
+        const inp = document.getElementById('f_' + el.dataset.key);
+        if (!inp) continue;
+        const n = byId['ns=' + ns + ';i=' + inp.value.trim()];
+        if (!n) {
+          el.innerHTML = '<span class="badge b-none">–</span>';
+          el.title = 'Kein Diagnosewert (keine Verbindung oder Knoten nicht konfiguriert)';
+        } else if (!n.exists) {
+          el.innerHTML = '<span class="badge b-bad">FEHLT</span>';
+          el.title = n.name + ' (' + n.nodeId + ') existiert nicht auf der SPS';
+        } else {
+          el.innerHTML = '<span class="badge b-ok">✓</span>' +
+            '<span class="badge ' + (n.readable ? 'b-ok' : 'b-bad') + '">L</span>' +
+            '<span class="badge ' + (n.writable ? 'b-ok' : 'b-bad') + '">S</span>';
+          el.title = n.name + ' (' + n.nodeId + ') – ' +
+            (n.readable ? 'lesbar' : 'NICHT lesbar') + ', ' +
+            (n.writable ? 'schreibbar' : 'NICHT schreibbar');
+        }
+      }
+    }
+
+    async function pollSps() {
+      try {
+        const s = await (await fetch('/api/sps_status')).json();
+        if (s.connected) { spsEl.textContent = 'SPS: verbunden'; spsEl.className = 'sps sps-on'; }
+        else { spsEl.textContent = 'SPS: getrennt'; spsEl.className = 'sps sps-off'; }
+      } catch (e) { spsEl.textContent = 'SPS: —'; spsEl.className = 'sps sps-unknown'; }
+    }
+    pollSps();
+    setInterval(pollSps, 2000);
+    pollNodes();
+    setInterval(pollNodes, 5000);
+  </script>
+</body>
+</html>

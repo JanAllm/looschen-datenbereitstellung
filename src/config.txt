@@ -1,0 +1,117 @@
+# Kamera-Einstellungen
+# Programmeinstellungen
+ProgrammId=OPCDATENVERARBEITUNG 
+# SPS-IP-Adresse
+ipSPS=opc.tcp://192.168.155.4:4840
+# Namespace-Index der SPS-Variablen (gilt fuer alle Knoten: ns=<Wert>;i=<Index>)
+ns=1
+folderPath=C:/Users/jan.allmrodt/Desktop/TestOrdner
+# Gibt die Maximalgröße der im Folder befindlichen Objekte vor (Das Array für den OPC Server darf nicht kleiner sein)
+MaximaleAnzahlProjekte=16
+# Größe des Arrays welches zum Datenübertragen genutzt wird
+LenDataArray=100
+
+# ------------------Allgemeine Variablen Knoten (Dialog etc)------------------
+# Index der Fehlervariable (write, bool)
+iError=120
+# Index der Informationsvariable (write, string)
+iInfo=122 
+# Index der Herzschlagvariable (write, int)
+iHeartbeat=123 
+# Index des Statuscode (write, int16_t)
+iStatusCode=124
+
+# ------------------Arrays------------------
+# Index des Datenarrays (write, float array)  
+iDataArry=19
+# Index des Projektarrays (write, string array)
+iProjektArray=138
+
+# ------------------Dialog Variablen------------------
+# ---------------FUNKTIONSAUFRUFE!---------------
+# ------------update Liste der verfügbaren Projekte------------
+# Trigger der Aktualisierungsliste des Projekts (read, bool)
+iUpdateProjektList=125 
+# Liste wurde geupdated (write, bool)
+iProjektlistUpdated=126
+
+# ----------------zeigt Informationen zum ausgewählten Projekt----------------
+# Trigger Variable für die Info (read, bool)
+showProjektInfo=127
+# Projekt aus dem String Array (read, string)
+iProjektName=128
+# Info zur Länge der Auswahl (write, int16_t)    
+iLenProjekt=129
+# Anzahl der Datenblöcke die das Projekt zur Übertragung benötigt (write, int16_t)
+iAnzDatenblöcke=130 
+# Projekt vorhanden (write, bool)
+ProjektVorhanden=131 
+# Gibt an dass die Infos geschrieben wurden (write, bool)
+ProjektInfoWrote=132
+
+# ---------------Ausgewähltes Projekt laden (read, bool)---------------
+# Trigger
+iReadProjekt=133 
+# Ausgabe dass ein Datenblock geschrieben wurde (write, bool)
+iWriteData=134 
+# Index des aktuellen Datenblocks (write, int16_t)
+iIndexData=135 
+# Wenn true wurde der Block von der SPS gelesen und der nächste wird geschrieben
+iReadData=136
+# Bricht die Datenübertragung ab (read, bool)
+iabbruchUbertragen=137
+# Variable dass die Übertragung beendet ist und die Anwendung wieder frei ist
+iUebertgarungBeendet=139
+
+# ---------------Länge der auf einmal übertragenden Daten (Array Len)---------------
+iUebertragungslaege=140
+
+# ---------------Designs der Zeichnungen---------------
+# ======Farbe G0 [G(255),B(255),R(255)] of Int======
+iFarbeG0=200
+# ======Stärke G0 Int (Tipp nehme Werte zwischen 2 und 10)======
+iStaerkeG0=201
+# ======Farbe G1 [G(255),B(255),R(255)] of Int======
+iFarbeG1=202
+# ======Stärke G1 Int======
+iStaerkeG1=203
+# ======Farbe G2 [G(255),B(255),R(255)] of Int======
+iFarbeG2=204
+# ======Stärke G2 Int======
+iStaerkeG2=205
+# ======Farbe G3 [G(255),B(255),R(255)] of Int======
+iFarbeG3=206
+# ======Stärke G3 Int======
+iStaerkeG3=207
+# ============= Farbe der AKTUELLEN Position [G(255),B(255),R(255)] of Int=====================
+iFarbeLive=210
+# ==== Farbe ERLEDIGTER Abschnitte [G,B,R] of Int; OPTIONAL (fehlt der Knoten -> Default Grau) ====
+iFarbeErledigt=215
+# ======Stärke der AKTUELLEN Position Int (Tipp nehme Werte zwischen 2 und 10)======
+iStaerkeLive=211
+# ==== Stärke ERLEDIGTER Abschnitte Int; OPTIONAL (fehlt der Knoten -> 0 = normale Stärke) ====
+iStaerkeErledigt=216
+
+# -------------------------Live Bild --------------------------------
+
+#Aktueller Stand im Programm
+iLiveStand=212
+#abbruchLive
+iLiveBreak=213
+
+# -------------------------Bogenglättung --------------------------------
+# Schwellwert-Radius (float): Bögen (G02/G03) mit kleinerem Radius werden zu
+# Linien (G01) umgewandelt - in der Visualisierung UND in den gesendeten Daten.
+# Wert 0 = deaktiviert.
+iMinArcRadius=214
+
+
+# ===== Canvas Größe =====
+objektgroesseX=208
+objektgroesseY=209
+
+# ===== WebServer =====
+sizeObjx=1000
+sizeObjy=2000
+webserVerImgSizeX=500
+webserVerImgSizeY=1000

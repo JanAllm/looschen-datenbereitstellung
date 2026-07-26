@@ -1,0 +1,40 @@
+# Kamera-Einstellungen
+
+//Programmeinstellungen
+ProgrammId=Buegelerkennung
+cam=0
+displyImg=true
+debugmode=true
+displyTerminal=true
+
+
+# Speicherort für Bilder
+speicherortBilder=C:/Users/jan.allmrodt/Desktop/TestBild/
+speicherortBilderDebugModeC:/Users/jan.allmrodt/Desktop/TestBild/
+speicherortBeispielbild=c:/Users/jan.allmrodt/Desktop/testEimer/saved_image_Tex32.png
+
+// Kameraeinstellungen
+# Bildgröße
+width=2592
+height=1944
+
+# Kanal-Einstellungen
+channels=3
+exposureTime=5000.0 //set exposure Time in Camera (in µs)
+targetBrightness=150 // Target of mean Brightness in ROI
+toleranceAutoExposure=20 //toleranceAutoExposure
+
+# SPS-IP-Adresse
+ipSPS=169.254.84.223
+
+// Variablen
+# Integer-Werte
+iInt0=160 //Threshold 
+iInt1=11 // median Filter
+iInt2=21 // Closing
+
+# Float-Werte
+iFloat1=0.5     // MittelPunkt Eimer x
+iFloat2=0.55    // Mittelpunkt Eimer y
+iFloat3=0.8     //Innerer Eimerrand
+iFloat4=0.95    //äuserer Eimerrand

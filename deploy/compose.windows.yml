@@ -1,0 +1,8 @@
+# Windows/Docker-Desktop-Override: Bridge-Netzwerk mit veröffentlichtem Port.
+# Die SPS im LAN wird ausgehend über das Bridge-NAT erreicht (ipSPS in den
+# Einstellungen auf die SPS-IP setzen).
+#   docker compose -f docker-compose.yml -f compose.windows.yml up -d --build
+services:
+  datenbereitstellung:
+    ports:
+      - "5000:5000"
