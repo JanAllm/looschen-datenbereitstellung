@@ -162,6 +162,7 @@ bool ProjectManager::transferProjectData()
         const double arcThreshold = okArc ? static_cast<double>(minArcRadius) : 0.0;
 
         int currentBlock = 0;
+        bool completed = false;
 
         // Without progress the wait below would block the shared SPS thread
         // forever (no heartbeat, PLC watchdog trips). Abort when the PLC does
@@ -234,12 +235,41 @@ bool ProjectManager::transferProjectData()
             // Fertig?
             if (currentBlock >= anzBlocke)
             {
+                completed = true;
                 pushInfo("Alle Blöcke übertragen.");
                 break;
             }
         }
 
-        // 6. Abschluss
+        // 6. Abschluss. The PLC acknowledges every block (see
+        // docs/KONFIGURATION.md). Without waiting for the final
+        // acknowledgement, setTransferFlags below would clear WriteData only
+        // milliseconds after it was set - a PLC cycle that misses that window
+        // would lose the last block. Acknowledgement is either WriteData
+        // cleared by the PLC or ReadData set again.
+        if (completed)
+        {
+            const auto ackDeadline =
+                std::chrono::steady_clock::now() + std::chrono::seconds(5);
+            while (std::chrono::steady_clock::now() < ackDeadline)
+            {
+                if (keepAlive_ && !keepAlive_())
+                    break;
+
+                auto [writeData, succWrite, codeWrite] = controller_.readBool("WriteData");
+                if (succWrite && !writeData)
+                    break;
+
+                auto [readAck, succAck, codeAck] = controller_.readBool("ReadData");
+                if (succAck && readAck)
+                {
+                    controller_.writeBool("ReadData", false);
+                    break;
+                }
+
+                std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            }
+        }
         setTransferFlags(false, false, true);
         return true;
     }

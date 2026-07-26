@@ -126,6 +126,7 @@ public:
     bool readFloat(const std::string &name, float &value);
     bool readDouble(const std::string &name, double &value);
     bool readString(const std::string &name, std::string &value);
+    bool readStringArray(const std::string &name, std::vector<std::string> &value);
 
     // ========== Variablen schreiben ==========
 
@@ -167,6 +168,11 @@ private:
     };
     std::unordered_map<std::string, VariableInfo> variables_;
     mutable std::mutex variablesMutex_;
+
+    // Serializes every UA_Server_* call against the server loop. open62541 is
+    // built with UA_MULTITHREADING=0 on Linux, so concurrent server access
+    // from test threads would be a data race without this.
+    mutable std::mutex serverMutex_;
 
     // Server Loop (läuft in separatem Thread)
     void serverLoop();

@@ -104,9 +104,14 @@ void OPCUAServer::serverLoop()
 
     while (!stopRequested_.load())
     {
-        // Server-Iteration (16ms = ~60 FPS)
-        UA_Server_run_iterate(server_, true);
-        std::this_thread::sleep_for(std::chrono::milliseconds(16));
+        // waitInternal=false: the iterate call must not block while holding
+        // serverMutex_, otherwise concurrent reads/writes from test threads
+        // would starve. The short sleep outside the lock paces the loop.
+        {
+            std::lock_guard<std::mutex> serverLock(serverMutex_);
+            UA_Server_run_iterate(server_, false);
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(5));
     }
 
     std::cout << "🔄 Server-Loop beendet" << std::endl;
@@ -255,14 +260,10 @@ bool OPCUAServer::addStringArrayVariable(uint16_t nsIndex, uint32_t numericId, c
     UA_Variant_init(&variant);
     UA_Variant_setArray(&variant, uaArray, arraySize, &UA_TYPES[UA_TYPES_STRING]);
 
-    bool result = addVariableNodeNumeric(nsIndex, numericId, name, UA_TYPES[UA_TYPES_STRING].typeId, variant, "StringArray");
-
-    // Cleanup
-    if (uaArray) {
-        UA_Array_delete(uaArray, arraySize, &UA_TYPES[UA_TYPES_STRING]);
-    }
-
-    return result;
+    // No UA_Array_delete here: UA_Variant_setArray does not copy - ownership
+    // moved to attr and is released inside addVariableNodeNumeric. The former
+    // cleanup here was a double free.
+    return addVariableNodeNumeric(nsIndex, numericId, name, UA_TYPES[UA_TYPES_STRING].typeId, variant, "StringArray");
 }
 
 bool OPCUAServer::addInt16ArrayVariable(uint16_t nsIndex, uint32_t numericId, const std::string &name, const std::vector<int16_t> &initialValue)
@@ -281,14 +282,10 @@ bool OPCUAServer::addInt16ArrayVariable(uint16_t nsIndex, uint32_t numericId, co
     UA_Variant_init(&variant);
     UA_Variant_setArray(&variant, uaArray, arraySize, &UA_TYPES[UA_TYPES_INT16]);
 
-    bool result = addVariableNodeNumeric(nsIndex, numericId, name, UA_TYPES[UA_TYPES_INT16].typeId, variant, "Int16Array");
-
-    // Cleanup
-    if (uaArray) {
-        UA_Array_delete(uaArray, arraySize, &UA_TYPES[UA_TYPES_INT16]);
-    }
-
-    return result;
+    // No UA_Array_delete here: UA_Variant_setArray does not copy - ownership
+    // moved to attr and is released inside addVariableNodeNumeric. The former
+    // cleanup here was a double free.
+    return addVariableNodeNumeric(nsIndex, numericId, name, UA_TYPES[UA_TYPES_INT16].typeId, variant, "Int16Array");
 }
 
 // ========== Private Helper mit numerischer NodeId ==========
@@ -357,6 +354,7 @@ bool OPCUAServer::readInt16(const std::string &name, int16_t &value)
         return false;
 
     UA_Variant variant;
+    std::lock_guard<std::mutex> serverLock(serverMutex_);
     UA_StatusCode retval = UA_Server_readValue(server_, nodeId, &variant);
 
     if (retval == UA_STATUSCODE_GOOD && variant.type == &UA_TYPES[UA_TYPES_INT16])
@@ -377,6 +375,7 @@ bool OPCUAServer::readInt32(const std::string &name, int32_t &value)
         return false;
 
     UA_Variant variant;
+    std::lock_guard<std::mutex> serverLock(serverMutex_);
     UA_StatusCode retval = UA_Server_readValue(server_, nodeId, &variant);
 
     if (retval == UA_STATUSCODE_GOOD && variant.type == &UA_TYPES[UA_TYPES_INT32])
@@ -397,6 +396,7 @@ bool OPCUAServer::readBool(const std::string &name, bool &value)
         return false;
 
     UA_Variant variant;
+    std::lock_guard<std::mutex> serverLock(serverMutex_);
     UA_StatusCode retval = UA_Server_readValue(server_, nodeId, &variant);
 
     if (retval == UA_STATUSCODE_GOOD && variant.type == &UA_TYPES[UA_TYPES_BOOLEAN])
@@ -417,6 +417,7 @@ bool OPCUAServer::readFloat(const std::string &name, float &value)
         return false;
 
     UA_Variant variant;
+    std::lock_guard<std::mutex> serverLock(serverMutex_);
     UA_StatusCode retval = UA_Server_readValue(server_, nodeId, &variant);
 
     if (retval == UA_STATUSCODE_GOOD && variant.type == &UA_TYPES[UA_TYPES_FLOAT])
@@ -437,6 +438,7 @@ bool OPCUAServer::readDouble(const std::string &name, double &value)
         return false;
 
     UA_Variant variant;
+    std::lock_guard<std::mutex> serverLock(serverMutex_);
     UA_StatusCode retval = UA_Server_readValue(server_, nodeId, &variant);
 
     if (retval == UA_STATUSCODE_GOOD && variant.type == &UA_TYPES[UA_TYPES_DOUBLE])
@@ -457,12 +459,41 @@ bool OPCUAServer::readString(const std::string &name, std::string &value)
         return false;
 
     UA_Variant variant;
+    std::lock_guard<std::mutex> serverLock(serverMutex_);
     UA_StatusCode retval = UA_Server_readValue(server_, nodeId, &variant);
 
     if (retval == UA_STATUSCODE_GOOD && variant.type == &UA_TYPES[UA_TYPES_STRING])
     {
         UA_String *uaString = (UA_String *)variant.data;
         value = std::string((char *)uaString->data, uaString->length);
+        UA_Variant_clear(&variant);
+        return true;
+    }
+
+    UA_Variant_clear(&variant);
+    return false;
+}
+
+bool OPCUAServer::readStringArray(const std::string &name, std::vector<std::string> &value)
+{
+    UA_NodeId nodeId;
+    if (!getNodeId(name, nodeId))
+        return false;
+
+    UA_Variant variant;
+    std::lock_guard<std::mutex> serverLock(serverMutex_);
+    UA_StatusCode retval = UA_Server_readValue(server_, nodeId, &variant);
+
+    if (retval == UA_STATUSCODE_GOOD && variant.type == &UA_TYPES[UA_TYPES_STRING] &&
+        !UA_Variant_isScalar(&variant))
+    {
+        UA_String *uaStrings = (UA_String *)variant.data;
+        value.clear();
+        value.reserve(variant.arrayLength);
+        for (size_t i = 0; i < variant.arrayLength; ++i)
+        {
+            value.emplace_back((char *)uaStrings[i].data, uaStrings[i].length);
+        }
         UA_Variant_clear(&variant);
         return true;
     }
@@ -483,6 +514,7 @@ bool OPCUAServer::writeInt16(const std::string &name, int16_t value)
     UA_Variant_init(&variant);
     UA_Variant_setScalar(&variant, &value, &UA_TYPES[UA_TYPES_INT16]);
 
+    std::lock_guard<std::mutex> serverLock(serverMutex_);
     UA_StatusCode retval = UA_Server_writeValue(server_, nodeId, variant);
     return retval == UA_STATUSCODE_GOOD;
 }
@@ -497,6 +529,7 @@ bool OPCUAServer::writeInt32(const std::string &name, int32_t value)
     UA_Variant_init(&variant);
     UA_Variant_setScalar(&variant, &value, &UA_TYPES[UA_TYPES_INT32]);
 
+    std::lock_guard<std::mutex> serverLock(serverMutex_);
     UA_StatusCode retval = UA_Server_writeValue(server_, nodeId, variant);
     return retval == UA_STATUSCODE_GOOD;
 }
@@ -512,6 +545,7 @@ bool OPCUAServer::writeBool(const std::string &name, bool value)
     UA_Variant_init(&variant);
     UA_Variant_setScalar(&variant, &uaValue, &UA_TYPES[UA_TYPES_BOOLEAN]);
 
+    std::lock_guard<std::mutex> serverLock(serverMutex_);
     UA_StatusCode retval = UA_Server_writeValue(server_, nodeId, variant);
     return retval == UA_STATUSCODE_GOOD;
 }
@@ -526,6 +560,7 @@ bool OPCUAServer::writeFloat(const std::string &name, float value)
     UA_Variant_init(&variant);
     UA_Variant_setScalar(&variant, &value, &UA_TYPES[UA_TYPES_FLOAT]);
 
+    std::lock_guard<std::mutex> serverLock(serverMutex_);
     UA_StatusCode retval = UA_Server_writeValue(server_, nodeId, variant);
     return retval == UA_STATUSCODE_GOOD;
 }
@@ -540,6 +575,7 @@ bool OPCUAServer::writeDouble(const std::string &name, double value)
     UA_Variant_init(&variant);
     UA_Variant_setScalar(&variant, &value, &UA_TYPES[UA_TYPES_DOUBLE]);
 
+    std::lock_guard<std::mutex> serverLock(serverMutex_);
     UA_StatusCode retval = UA_Server_writeValue(server_, nodeId, variant);
     return retval == UA_STATUSCODE_GOOD;
 }
@@ -556,6 +592,7 @@ bool OPCUAServer::writeString(const std::string &name, const std::string &value)
     UA_Variant_init(&variant);
     UA_Variant_setScalar(&variant, &uaString, &UA_TYPES[UA_TYPES_STRING]);
 
+    std::lock_guard<std::mutex> serverLock(serverMutex_);
     UA_StatusCode retval = UA_Server_writeValue(server_, nodeId, variant);
 
     UA_String_clear(&uaString);

@@ -93,7 +93,8 @@ Blockweise Übertragung mit Handshake (SPS bestätigt jeden Block):
    - Auf `ReadData`-Signal der SPS warten → `ReadData` löschen.
    - `readDataBlock()` liest die nächsten `lenDataArray` Zeilen.
    - Block in `DataArray` schreiben, `IndexData` hochzählen, `WriteData = true`.
-4. Nach dem letzten Block: `UebertgarungBeendet = true`.
+4. Nach dem letzten Block: auf die Bestätigung der SPS warten (`WriteData`
+   gelöscht oder `ReadData` erneut gesetzt, max. 5 s), dann `UebertgarungBeendet = true`.
 
 ### Live-Bild — `LiveImage`
 
