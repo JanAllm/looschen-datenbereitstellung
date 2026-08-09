@@ -235,6 +235,70 @@ static void applySettings(const SettingsStore &s)
     setupVars.iMinArcRadius = s.getInt("iMinArcRadius", setupVars.iMinArcRadius);
 }
 
+// Mirror image of applySettings: same keys, but read back from the runtime
+// variables instead of the database. This is what /api/active_settings serves,
+// so the settings page can show stored and in-use values side by side.
+//
+// managerBlockSize >= 0 overrides LenDataArray with the value the running
+// ProjectManager actually holds. That is exactly where the block size drifted
+// apart in the field report of 20.07.2026: the database said 100 while the
+// manager still worked with the 5 it had been constructed with.
+static nlohmann::json activeSettingsJson(int managerBlockSize = -1)
+{
+    nlohmann::json v = nlohmann::json::object();
+    auto put = [&v](const char *key, int value) { v[key] = std::to_string(value); };
+
+    v["ipSPS"] = ipOPC;
+    v["ProgrammId"] = ProgrammId;
+    put("ns", setupVars.ns);
+    v["folderPath"] = folderPath;
+    put("sizeObjx", sizeObjx);
+    put("sizeObjy", sizeObjy);
+    put("webserVerImgSizeX", webserVerImgSizeX);
+    put("webserVerImgSizeY", webserVerImgSizeY);
+    put("iError", setupVars.iError);
+    put("iInfo", setupVars.iInfo);
+    put("iHeartbeat", setupVars.iHeartbeat);
+    put("iStatusCode", setupVars.iStatusCode);
+    put("iDataArry", setupVars.iDataArry);
+    put("iProjektArray", setupVars.iProjektArray);
+    put("iUpdateProjektList", setupVars.iUpdateProjektList);
+    put("iProjektlistUpdated", setupVars.iProjektlistUpdated);
+    put("iProjektName", setupVars.iProjektName);
+    put("iReadProjekt", setupVars.iReadProjekt);
+    put("iLenProjekt", setupVars.iLenProjekt);
+    put("iAnzDatenblöcke", setupVars.iAnzDatenblocke);
+    put("iWriteData", setupVars.iWriteData);
+    put("iIndexData", setupVars.iIndexData);
+    put("iReadData", setupVars.iReadData);
+    put("MaximaleAnzahlProjekte", MaximaleAnzahlProjekte);
+    put("LenDataArray", managerBlockSize >= 0 ? managerBlockSize : lenDataArray);
+    put("iabbruchUbertragen", setupVars.iabbruchUbertragen);
+    put("showProjektInfo", setupVars.ishowProjektInfo);
+    put("ProjektInfoWrote", setupVars.iProjektInfoWrote);
+    put("ProjektVorhanden", setupVars.iProjektVorhanden);
+    put("iUebertgarungBeendet", setupVars.iUebertgarungBeendet);
+    put("iUebertragungslaege", setupVars.iUebertragungslaege);
+    put("iFarbeG0", setupVars.icolorG0);
+    put("iStaerkeG0", setupVars.istreghtsG0);
+    put("iFarbeG1", setupVars.icolorG1);
+    put("iStaerkeG1", setupVars.istreghtsG1);
+    put("iFarbeG2", setupVars.icolorG2);
+    put("iStaerkeG2", setupVars.istreghtsG2);
+    put("iFarbeG3", setupVars.icolorG3);
+    put("iStaerkeG3", setupVars.istreghtsG3);
+    put("objektgroesseX", setupVars.objektgroesseX);
+    put("objektgroesseY", setupVars.objektgroesseY);
+    put("iFarbeLive", setupVars.iFarbeLive);
+    put("iFarbeErledigt", setupVars.iFarbeErledigt);
+    put("iStaerkeLive", setupVars.iStaerkeLive);
+    put("iStaerkeErledigt", setupVars.iStaerkeErledigt);
+    put("iLiveStand", setupVars.iLiveStand);
+    put("iLiveBreak", setupVars.iLiveAbbruch);
+    put("iMinArcRadius", setupVars.iMinArcRadius);
+    return v;
+}
+
 // Render-Werte aus der Settings-DB als JSON (ersetzt die fruehere Python-Bruecke).
 static std::string renderParamsJson(const SettingsStore &s)
 {
@@ -610,6 +674,7 @@ static void spsWorkerLoop(SettingsStore *settingsPtr, AppState *statePtr)
     {
         // Aktuelle Einstellungen uebernehmen (ipSPS, Namespace, Knoten-Indizes).
         applySettings(settings);
+        state.setActiveSettings(activeSettingsJson());
         const long long bootRev = settings.bootstrapRevision();
 
         // Betriebsschalter: OPC-Verbindung komplett deaktiviert?
@@ -660,7 +725,9 @@ static void spsWorkerLoop(SettingsStore *settingsPtr, AppState *statePtr)
                                {"type", d.type},
                                {"exists", d.exists},
                                {"readable", d.readable},
-                               {"writable", d.writable}});
+                               {"writable", d.writable},
+                               {"hasValue", d.hasValue},
+                               {"value", d.value}});
             }
             state.setNodeDiagnostics(arr);
         };
@@ -690,6 +757,11 @@ static void spsWorkerLoop(SettingsStore *settingsPtr, AppState *statePtr)
         // count written to the PLC has nothing to do with LenDataArray.
         ProjectManager projectManager(spsController, state, folderPath,
                                       sizeObjx, sizeObjy, lenDataArray);
+
+        // Ab hier ist der Manager die maßgebliche Quelle der Blockgröße. Wenn
+        // sie je wieder von der Einstellung abweicht, steht es jetzt auf der
+        // Einstellungsseite, statt erst in der Blockzahl auf der SPS aufzufallen.
+        state.setActiveSettings(activeSettingsJson(projectManager.getDataArrayLength()));
 
         collectDiag(spsController);
         auto lastDiag = std::chrono::steady_clock::now();
@@ -915,6 +987,9 @@ int main(int argc, char* argv[])
     static SettingsStore settingsStore(settingsDbPath);
     settingsStore.init();
     applySettings(settingsStore);
+    // Ohne SPS gibt es noch keinen ProjectManager, daher hier ohne Blockgroesse
+    // aus dem Manager. Die Seite zeigt trotzdem schon die geltenden Werte.
+    appState.setActiveSettings(activeSettingsJson());
     ErrorLoggerSingleton::instance().logError(
         "Einstellungen geladen (" + settingsDbPath + "): folderPath=" + folderPath +
         ", ipSPS=" + ipOPC);

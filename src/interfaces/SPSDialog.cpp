@@ -1,5 +1,7 @@
 #include "interfaces/SPSDialog.h"
 #include <algorithm>
+#include <iomanip>
+#include <sstream>
 using namespace std;
 SPSDialog::SPSDialog(std::shared_ptr<ISPSClient> client)
     : client(std::move(client)) {
@@ -315,4 +317,91 @@ bool SPSDialog::probeNode(const std::string &nodeId, bool &readable, bool &writa
     if (!client)
         return false;
     return client->readAccessLevel(nodeId, readable, writable);
+}
+
+bool SPSDialog::readNodeValueAsString(const std::string &nodeId, DataType type, std::string &out)
+{
+    out.clear();
+    if (!client)
+        return false;
+
+    // Build the descriptor on the fly instead of looking it up in variableMap:
+    // an unregistered node is exactly the case this is meant to diagnose.
+    VariableInfo var;
+    var.name = nodeId;
+    var.fullName = nodeId;
+    var.type = type;
+
+    // Floats are shown with a fixed precision and trailing zeros stripped,
+    // otherwise a 140 arrives in the UI as "140.000000".
+    auto formatReal = [](double v) {
+        std::ostringstream os;
+        os << std::fixed << std::setprecision(3) << v;
+        std::string s = os.str();
+        const auto dot = s.find('.');
+        if (dot != std::string::npos)
+        {
+            s.erase(s.find_last_not_of('0') + 1);
+            if (!s.empty() && s.back() == '.')
+                s.pop_back();
+        }
+        return s;
+    };
+
+    switch (type)
+    {
+    case DataType::Int16:
+    {
+        auto [v, ok, code] = client->readInt16(var);
+        if (!ok)
+            return false;
+        out = std::to_string(v);
+        return true;
+    }
+    case DataType::Int32:
+    {
+        auto [v, ok, code] = client->readInt32(var);
+        if (!ok)
+            return false;
+        out = std::to_string(v);
+        return true;
+    }
+    case DataType::Float:
+    {
+        auto [v, ok, code] = client->readFloat(var);
+        if (!ok)
+            return false;
+        out = formatReal(static_cast<double>(v));
+        return true;
+    }
+    case DataType::Double:
+    {
+        auto [v, ok, code] = client->readDouble(var);
+        if (!ok)
+            return false;
+        out = formatReal(v);
+        return true;
+    }
+    case DataType::Bool:
+    {
+        auto [v, ok, code] = client->readBool(var);
+        if (!ok)
+            return false;
+        out = v ? "true" : "false";
+        return true;
+    }
+    case DataType::String:
+    {
+        auto [v, ok, code] = client->readString(var);
+        if (!ok)
+            return false;
+        // Info_Text and friends are 255 chars wide; keep the row readable.
+        constexpr size_t kMaxLen = 60;
+        out = v.size() > kMaxLen ? v.substr(0, kMaxLen) + "..." : v;
+        return true;
+    }
+    default:
+        // Arrays: deliberately not read, see the header.
+        return false;
+    }
 }

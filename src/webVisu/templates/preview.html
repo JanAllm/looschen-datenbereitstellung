@@ -12,6 +12,10 @@
     header { display: flex; align-items: center; justify-content: space-between;
              padding: 12px 20px; background: #1f2937; color: #fff; }
     header h1 { font-size: 1rem; margin: 0; font-weight: 600; }
+    /* Stand des laufenden Dienstes, oben links unter dem Titel. */
+    .brand { display: flex; flex-direction: column; gap: 2px; }
+    .appver { font-size: .72rem; color: #9ca3af; font-variant-numeric: tabular-nums; }
+    .appver .rev { color: #d1d5db; }
     header a { color: #fff; text-decoration: none; font-size: .9rem;
                border: 1px solid rgba(255,255,255,.4); padding: 6px 12px; border-radius: 6px; }
     header a:hover { background: rgba(255,255,255,.12); }
@@ -55,7 +59,10 @@
 </head>
 <body>
   <header>
-    <h1>Vorschau – ohne SPS</h1>
+    <div class="brand">
+      <h1>Vorschau – ohne SPS</h1>
+      <div id="appver" class="appver">Version wird geladen …</div>
+    </div>
     <a href="/settings">⚙ Einstellungen</a>
   </header>
   <main>
@@ -284,6 +291,23 @@
     $('btnStop').onclick = stopRun;
     loadProjects();
     loadRenderParams();
+
+    // Stand des laufenden Binaries, oben links. Ändert sich zur Laufzeit
+    // nicht, also einmal laden statt pollen.
+    (async function loadVersion() {
+      const el = document.getElementById('appver');
+      const esc = (s) => String(s === undefined || s === null ? '' : s)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      try {
+        const v = await (await fetch('/api/version')).json();
+        el.innerHTML = 'v' + esc(v.version) +
+          ' · <span class="rev">' + esc(v.gitRev) + '</span>' +
+          ' · ' + esc(v.buildDate);
+        el.title = 'Gebaut am ' + v.buildDate + ', Git-Stand ' + v.gitRev;
+      } catch (e) {
+        el.textContent = 'Version nicht abrufbar';
+      }
+    })();
   </script>
 </body>
 </html>

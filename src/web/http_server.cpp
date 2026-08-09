@@ -13,6 +13,18 @@
 #include "web/app_state.h"
 #include "web/settings_store.h"
 
+// Kommen aus CMake (target_compile_definitions). Die Fallbacks halten die
+// Datei uebersetzbar, wenn sie einmal ausserhalb des Projekt-Builds landet.
+#ifndef APP_VERSION
+#define APP_VERSION "?"
+#endif
+#ifndef APP_BUILD_DATE
+#define APP_BUILD_DATE "?"
+#endif
+#ifndef APP_GIT_REV
+#define APP_GIT_REV "unbekannt"
+#endif
+
 #ifdef CPPHTTPLIB_OPENSSL_SUPPORT
 #include <openssl/evp.h>
 #include <openssl/pem.h>
@@ -407,6 +419,22 @@ struct HttpServer::Impl
                                  {"message", state.spsMessage()}}
                                 .dump(),
                             "application/json");
+        });
+
+        // Stand des laufenden Binaries. Kommt aus CMake, nicht aus der DB -
+        // eine Einstellung koennte man verstellen, ohne dass der Code wechselt.
+        svr.Get("/api/version", [](const httplib::Request&, httplib::Response& res) {
+            res.set_content(json{{"version", APP_VERSION},
+                                 {"buildDate", APP_BUILD_DATE},
+                                 {"gitRev", APP_GIT_REV}}
+                                .dump(),
+                            "application/json");
+        });
+
+        // Werte, mit denen der Dienst gerade arbeitet. Bewusst getrennt von
+        // /api/settings: dort steht, was gespeichert ist, hier, was wirkt.
+        svr.Get("/api/active_settings", [this](const httplib::Request&, httplib::Response& res) {
+            res.set_content(json{{"values", state.activeSettings()}}.dump(), "application/json");
         });
 
         // Live-Diagnose der OPC-Knoten: existiert / lesbar / schreibbar.

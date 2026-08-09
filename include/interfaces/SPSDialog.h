@@ -75,6 +75,12 @@ public:
     /// Prueft einen Knoten direkt (AccessLevel), ohne ihn registrieren zu muessen.
     bool probeNode(const std::string &nodeId, bool &readable, bool &writable);
 
+    /// Reads a node's current value directly by NodeId, without registering it.
+    /// Same reason as probeNode: the diagnostics view must also work when the
+    /// registration failed. Arrays return false on purpose - they can hold
+    /// thousands of elements and the settings page only shows scalars.
+    bool readNodeValueAsString(const std::string &nodeId, DataType type, std::string &out);
+
     /// Aktive OPC-Sitzung vorhanden?
     bool isConnected() { return client && client->isConnected(); }
 

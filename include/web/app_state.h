@@ -64,6 +64,13 @@ public:
     void setNodeDiagnostics(nlohmann::json diag);
     nlohmann::json nodeDiagnostics() const;
 
+    // ---- Werte, mit denen der Dienst gerade wirklich arbeitet ----
+    /// Flat map setting key -> value in use, for /api/active_settings.
+    /// The point is the gap this makes visible: the settings DB can say 100
+    /// while the running ProjectManager still holds the 5 it was built with.
+    void setActiveSettings(nlohmann::json values);
+    nlohmann::json activeSettings() const;
+
     // ---- Laufzeit-Steuerung ----
     void requestShutdown() { shutdown_.store(true); }
     bool shutdownRequested() const { return shutdown_.load(); }
@@ -86,6 +93,7 @@ private:
 
     std::string spsMessage_;
     nlohmann::json nodeDiag_ = nlohmann::json::array();
+    nlohmann::json activeSettings_ = nlohmann::json::object();
 
     std::atomic<long long> gen_{0};
     std::atomic<bool> spsConnected_{false};

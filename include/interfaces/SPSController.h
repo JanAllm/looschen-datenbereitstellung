@@ -481,6 +481,11 @@ public:
             d.nodeId = nodeId;
             d.type = dataTypeName(type);
             d.exists = dialog->probeNode(nodeId, d.readable, d.writable);
+            // One extra read per readable scalar node, every diagnostics pass
+            // (10 s). Arrays are skipped inside readNodeValueAsString, so the
+            // data block itself is never pulled just to fill the settings page.
+            if (d.exists && d.readable)
+                d.hasValue = dialog->readNodeValueAsString(nodeId, type, d.value);
             out.push_back(d);
         }
         return out;

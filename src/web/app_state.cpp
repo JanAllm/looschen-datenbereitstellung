@@ -116,3 +116,15 @@ nlohmann::json AppState::nodeDiagnostics() const
     std::lock_guard<std::mutex> lock(mtx_);
     return nodeDiag_;
 }
+
+void AppState::setActiveSettings(nlohmann::json values)
+{
+    std::lock_guard<std::mutex> lock(mtx_);
+    activeSettings_ = std::move(values);
+}
+
+nlohmann::json AppState::activeSettings() const
+{
+    std::lock_guard<std::mutex> lock(mtx_);
+    return activeSettings_;
+}

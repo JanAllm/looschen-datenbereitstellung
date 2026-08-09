@@ -17,6 +17,11 @@
       padding: 12px 20px; background: #1f2937; color: #fff;
     }
     header h1 { font-size: 1rem; margin: 0; font-weight: 600; }
+    /* Stand des laufenden Dienstes, oben links unter dem Titel. Auf dem Pi ist
+       das der einzige Weg, ohne SSH zu sehen, welcher Stand dort laeuft. */
+    .brand { display: flex; flex-direction: column; gap: 2px; }
+    .appver { font-size: .72rem; color: #9ca3af; font-variant-numeric: tabular-nums; }
+    .appver .rev { color: #d1d5db; }
     header a {
       color: #fff; text-decoration: none; font-size: .9rem;
       border: 1px solid rgba(255,255,255,.4); padding: 6px 12px; border-radius: 6px;
@@ -111,11 +116,34 @@
     .ops-off { background: #059669; }
     .nodestat { flex: 0 0 130px; text-align: right; font-size: .75rem; }
     .nodestat .badge + .badge { margin-left: 4px; }
+    /* Zwei Wertspalten neben dem Eingabefeld: was der Dienst benutzt und was
+       auf der SPS steht. Beide sind reine Anzeige, nichts davon ist editierbar. */
+    .liveval { flex: 0 0 118px; text-align: right; font-size: .75rem;
+               color: #6b7280; white-space: nowrap; overflow: hidden;
+               text-overflow: ellipsis; }
+    .liveval .vlabel { color: #9ca3af; margin-right: 4px; }
+    .liveval .vnum { font-variant-numeric: tabular-nums; color: #374151; }
+    .liveval .vnone { color: #9ca3af; }
+    .liveval .vdirect { color: #9ca3af; font-style: italic; }
+    /* Weicht der wirksame Wert vom gespeicherten ab, ist das der interessante
+       Fall - genau so blieb die Blockgroesse 5, waehrend die DB 100 sagte. */
+    .liveval.mismatch .vnum { color: #991b1b; font-weight: 700; }
+    .liveval.mismatch .vlabel { color: #991b1b; }
+    /* Auf schmalen Panels (HMI am Pi) bliebe fuer das Eingabefeld sonst kaum
+       Platz: Beschriftung auf eine eigene Zeile, Werte daneben. */
+    @media (max-width: 900px) {
+      .row { flex-wrap: wrap; }
+      .row label { flex: 0 0 100%; }
+      .row input { flex: 1 1 180px; }
+    }
   </style>
 </head>
 <body>
   <header>
-    <h1>Einstellungen</h1>
+    <div class="brand">
+      <h1>Einstellungen</h1>
+      <div id="appver" class="appver">Version wird geladen …</div>
+    </div>
     <div style="display:flex; align-items:center; gap:14px;">
       <span id="spsStatus" class="sps sps-unknown">SPS: —</span>
       <a href="/preview">▷ Vorschau</a>
@@ -182,6 +210,8 @@
         }
         renderOps();
         saveBtn.disabled = false;
+        // Erst jetzt, die Zeilen muessen stehen. Danach uebernimmt das Intervall.
+        pollActive();
       } catch (e) {
         groupsEl.textContent = 'Fehler beim Laden der Einstellungen: ' + e;
       }
@@ -235,9 +265,23 @@
       inp.type = f.type === 'int' ? 'number' : 'text';
       row.appendChild(lab); row.appendChild(inp);
 
-      // Bei OPC-Knoten direkt anzeigen, ob der Knoten auf der SPS verfuegbar ist.
-      // 'ns' ist selbst kein Knoten -> keine Anzeige.
+      // Spalte 1: der Wert, mit dem der Dienst gerade wirklich arbeitet.
+      // Gilt fuer jede Einstellung, nicht nur fuer OPC-Knoten.
+      const act = document.createElement('span');
+      act.className = 'liveval';
+      act.dataset.actkey = f.key;
+      act.innerHTML = '<span class="vlabel">aktiv</span><span class="vnone">–</span>';
+      row.appendChild(act);
+
+      // Spalte 2: der Wert, den die SPS auf diesem Knoten fuehrt, plus die
+      // bisherigen Badges. 'ns' ist selbst kein Knoten -> keine Anzeige.
       if (category === 'OPC-Knoten' && f.key !== 'ns') {
+        const live = document.createElement('span');
+        live.className = 'liveval';
+        live.dataset.livekey = f.key;
+        live.innerHTML = '<span class="vlabel">SPS</span><span class="vnone">–</span>';
+        row.appendChild(live);
+
         const st = document.createElement('span');
         st.className = 'nodestat';
         st.dataset.key = f.key;
@@ -368,6 +412,68 @@
              (ok ? textOk : textBad) + '</span>';
     }
 
+    // Knotennamen und -werte kommen von der SPS, also nicht ungeprueft als
+    // HTML einsetzen.
+    function esc(s) {
+      return String(s === undefined || s === null ? '' : s)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    function valueHtml(label, text) {
+      return '<span class="vlabel">' + label + '</span>' +
+             (text === null
+               ? '<span class="vnone">–</span>'
+               : '<span class="vnum">' + esc(text) + '</span>');
+    }
+
+    // Werte, mit denen der Dienst arbeitet. Getrennt von /api/settings, weil
+    // dort steht, was gespeichert ist, und hier, was tatsaechlich wirkt.
+    async function pollActive() {
+      let values = null;               // null = Endpunkt nicht erreichbar
+      try {
+        const d = await (await fetch('/api/active_settings')).json();
+        values = d.values || {};
+      } catch (e) {
+        values = null;
+      }
+      for (const el of document.querySelectorAll('[data-actkey]')) {
+        const key = el.dataset.actkey;
+        const has = values !== null &&
+                    Object.prototype.hasOwnProperty.call(values, key);
+
+        if (values === null) {
+          el.innerHTML = valueHtml('aktiv', null);
+          el.classList.remove('mismatch');
+          el.title = 'Der Dienst meldet gerade keine aktiven Werte.';
+          continue;
+        }
+        // Nicht gemeldete Schluessel sind kein Fehler: diese Einstellungen
+        // haelt der Dienst nicht in einer Variable, er liest sie bei jeder
+        // Verwendung frisch aus der DB. Sie koennen deshalb gar nicht
+        // auseinanderlaufen - das ist eine Aussage, kein fehlender Wert.
+        if (!has) {
+          el.innerHTML = '<span class="vdirect">direkt aus DB</span>';
+          el.classList.remove('mismatch');
+          el.title = 'Diese Einstellung wird bei jeder Verwendung frisch aus ' +
+                     'der Datenbank gelesen. Gespeicherter und wirksamer Wert ' +
+                     'können hier nicht abweichen.';
+          continue;
+        }
+
+        el.innerHTML = valueHtml('aktiv', values[key]);
+        // Abgleich gegen den gespeicherten Stand, nicht gegen das Eingabefeld:
+        // waehrend des Tippens waere sonst jede Zwischeneingabe rot.
+        const stored = loadedValues[key];
+        const differs = stored !== undefined && String(values[key]) !== String(stored);
+        el.classList.toggle('mismatch', differs);
+        el.title = differs
+          ? 'Gespeichert ist "' + stored + '", der Dienst arbeitet aber mit "' +
+            values[key] + '". Wirkt erst nach Reconnect bzw. Neustart.'
+          : 'Gespeicherter und wirksamer Wert stimmen überein.';
+      }
+    }
+
     async function pollNodes() {
       const wrap = document.getElementById('diagWrap');
       const sum = document.getElementById('diagSummary');
@@ -386,13 +492,16 @@
           ? '<span class="badge b-bad">' + missing + ' fehlend</span> von ' + nodes.length
           : '<span class="badge b-ok">alle ' + nodes.length + ' vorhanden</span>';
         let html = '<table id="diagTable"><thead><tr>' +
-          '<th>Knoten</th><th>NodeId</th><th>Typ</th>' +
+          '<th>Knoten</th><th>NodeId</th><th>Typ</th><th>Wert</th>' +
           '<th>vorhanden</th><th>lesbar</th><th>schreibbar</th></tr></thead><tbody>';
         for (const n of nodes) {
           html += '<tr class="' + (n.exists ? '' : 'row-missing') + '">' +
-            '<td>' + n.name + '</td>' +
-            '<td><code>' + n.nodeId + '</code></td>' +
-            '<td>' + n.type + '</td>' +
+            '<td>' + esc(n.name) + '</td>' +
+            '<td><code>' + esc(n.nodeId) + '</code></td>' +
+            '<td>' + esc(n.type) + '</td>' +
+            // Arrays werden bewusst nicht gelesen, deshalb hier kein Wert.
+            '<td>' + (n.hasValue ? '<code>' + esc(n.value) + '</code>'
+                                 : '<span class="badge b-none">–</span>') + '</td>' +
             '<td>' + badge(n.exists, 'ja', 'FEHLT') + '</td>' +
             '<td>' + (n.exists ? badge(n.readable, 'ja', 'nein')
                                : '<span class="badge b-none">–</span>') + '</td>' +
@@ -415,6 +524,22 @@
       for (const n of nodes) byId[n.nodeId] = n;
       const nsInput = document.getElementById('f_ns');
       const ns = nsInput ? nsInput.value.trim() : '1';
+
+      // Wert des Knotens neben das jeweilige Feld schreiben. Gleiche
+      // Zuordnung ueber die NodeId wie unten bei den Badges.
+      for (const el of document.querySelectorAll('[data-livekey]')) {
+        const inp = document.getElementById('f_' + el.dataset.livekey);
+        const n = inp ? byId['ns=' + ns + ';i=' + inp.value.trim()] : null;
+        el.innerHTML = valueHtml('SPS', n && n.hasValue ? n.value : null);
+        el.title = !n
+          ? 'Kein Knoten unter dieser NodeId (keine Verbindung oder nicht konfiguriert)'
+          : n.hasValue
+            ? n.name + ' (' + n.nodeId + ') = ' + n.value
+            : n.exists
+              ? n.name + ' (' + n.nodeId + '): kein Einzelwert (Array oder nicht lesbar)'
+              : n.name + ' (' + n.nodeId + ') existiert nicht auf der SPS';
+      }
+
       for (const el of document.querySelectorAll('.nodestat')) {
         const inp = document.getElementById('f_' + el.dataset.key);
         if (!inp) continue;
@@ -445,8 +570,25 @@
     }
     pollSps();
     setInterval(pollSps, 2000);
+    // Stand des laufenden Binaries. Ändert sich zur Laufzeit nicht, also
+    // einmal laden statt pollen.
+    async function loadVersion() {
+      const el = document.getElementById('appver');
+      try {
+        const v = await (await fetch('/api/version')).json();
+        el.innerHTML = 'v' + esc(v.version) +
+          ' · <span class="rev">' + esc(v.gitRev) + '</span>' +
+          ' · ' + esc(v.buildDate);
+        el.title = 'Gebaut am ' + v.buildDate + ', Git-Stand ' + v.gitRev;
+      } catch (e) {
+        el.textContent = 'Version nicht abrufbar';
+      }
+    }
+    loadVersion();
+
     pollNodes();
     setInterval(pollNodes, 5000);
+    setInterval(pollActive, 5000);
   </script>
 </body>
 </html>

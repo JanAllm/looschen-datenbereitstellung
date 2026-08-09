@@ -25,4 +25,9 @@ struct NodeDiagnostic {
     bool exists = false;
     bool readable = false;
     bool writable = false;
+    /// Current value on the PLC, formatted for display. Only filled for
+    /// readable scalar nodes; hasValue stays false for arrays and for nodes
+    /// whose read failed, so the UI can tell "no value" from "value is 0".
+    bool hasValue = false;
+    std::string value;
 };

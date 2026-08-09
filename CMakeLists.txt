@@ -7,6 +7,49 @@ cmake_minimum_required(VERSION 3.18 FATAL_ERROR)
 project(MyCppExecutable VERSION 1.0 LANGUAGES C CXX)
 
 # ────────────────────────────────
+# Version, Bauzeitpunkt, Git-Stand für die Weboberfläche
+# ────────────────────────────────
+# Zweck: auf dem Pi soll ohne SSH erkennbar sein, welcher Stand dort läuft.
+# Der Bauzeitpunkt entsteht beim Konfigurieren und ist überall verfügbar.
+# Der Git-Stand nicht: .dockerignore schließt .git/ aus, im Container gibt es
+# also kein Repository. Deshalb kann er per -DAPP_GIT_REV hereingereicht
+# werden (der Dockerfile tut das über ARG GIT_REV), und nur wenn das fehlt,
+# wird lokal git befragt.
+string(TIMESTAMP APP_BUILD_DATE "%Y-%m-%d %H:%M UTC" UTC)
+
+if(NOT DEFINED APP_GIT_REV OR APP_GIT_REV STREQUAL "")
+    set(APP_GIT_REV "")
+    find_package(Git QUIET)
+    if(GIT_FOUND AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/.git")
+        execute_process(
+            COMMAND "${GIT_EXECUTABLE}" rev-parse --short HEAD
+            WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+            OUTPUT_VARIABLE APP_GIT_REV
+            OUTPUT_STRIP_TRAILING_WHITESPACE
+            ERROR_QUIET)
+        # Uncommittete Änderungen kennzeichnen, sonst zeigt ein Testbau auf dem
+        # Pi einen Commit an, der so nie gebaut wurde.
+        execute_process(
+            COMMAND "${GIT_EXECUTABLE}" diff --quiet HEAD
+            WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+            RESULT_VARIABLE APP_GIT_DIRTY
+            ERROR_QUIET)
+        if(APP_GIT_REV AND NOT APP_GIT_DIRTY EQUAL 0)
+            set(APP_GIT_REV "${APP_GIT_REV}+")
+        endif()
+    endif()
+endif()
+
+if(NOT APP_GIT_REV)
+    set(APP_GIT_REV "unbekannt")
+endif()
+
+message(STATUS "✓ Version ${PROJECT_VERSION} (${APP_GIT_REV}), gebaut ${APP_BUILD_DATE}")
+# Bewusst NICHT add_compile_definitions: APP_BUILD_DATE ändert sich bei jedem
+# Konfigurieren, global gesetzt würden dadurch auch open62541 und SQLite jedes
+# Mal neu übersetzt. Die Zuweisung an die eigenen Targets steht weiter unten.
+
+# ────────────────────────────────
 # C++-Standard festlegen
 # ────────────────────────────────
 set(CMAKE_CXX_STANDARD 20)
@@ -161,6 +204,13 @@ if(OpenSSL_FOUND)
     target_compile_definitions(MyCppLibrary PUBLIC CPPHTTPLIB_OPENSSL_SUPPORT)
     target_link_libraries(MyCppLibrary PUBLIC OpenSSL::SSL OpenSSL::Crypto)
 endif()
+
+# Versionsangaben für /api/version (oben ermittelt). PRIVATE reicht: gelesen
+# werden sie nur in src/web/http_server.cpp.
+target_compile_definitions(MyCppLibrary PRIVATE
+    APP_VERSION="${PROJECT_VERSION}"
+    APP_BUILD_DATE="${APP_BUILD_DATE}"
+    APP_GIT_REV="${APP_GIT_REV}")
 
 # Der amalgamierte Header open62541.h wird von einem separaten Target erzeugt.
 # MyCppLibrary muss darauf warten, sonst schlägt der Include beim Kompilieren fehl.

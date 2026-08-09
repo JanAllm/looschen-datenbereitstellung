@@ -25,11 +25,18 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /src
 COPY . .
 
+# Git-Stand für die Versionsanzeige. .git/ liegt nicht im Build-Kontext
+# (siehe .dockerignore), im Container kann CMake das Repo also nicht befragen.
+# Ohne diesen Wert zeigt die Oberfläche "unbekannt":
+#   docker build --build-arg GIT_REV=$(git rev-parse --short HEAD) -t ... .
+ARG GIT_REV=
+
 # open62541 wird im Projekt-Build mitgebaut (siehe CMakeLists). Tests aus,
 # damit im Image kein GoogleTest heruntergeladen wird.
 RUN cmake -B build -G Ninja \
         -DCMAKE_BUILD_TYPE=Release \
         -DBUILD_TESTS=OFF \
+        -DAPP_GIT_REV="${GIT_REV}" \
  && cmake --build build --target MyCppExecutable
 
 # =============================================================================
