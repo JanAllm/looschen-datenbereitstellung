@@ -115,6 +115,63 @@ PROJECT_FOLDER=/srv/cnc/projekte docker compose -f compose.deploy.yml -f compose
 > z. B. `janallm/looschen-datenbereitstellung:1.0`.
 > Repository: <https://hub.docker.com/r/janallm/looschen-datenbereitstellung>
 
+### Image selbst hosten (ohne Docker Hub)
+
+Wenn das Image nicht über Docker Hub laufen soll — etwa weil die Anlage keinen
+Internetzugang hat oder ein eigener Stand verteilt wird — gibt es zwei Wege.
+In beiden Fällen wird das Image zuerst aus dem Quellcode gebaut
+(`docker compose build`, ergibt `looschen-datenbereitstellung:latest`).
+
+**Weg 1 – Image als Datei übergeben (offline, der einfachste Weg):**
+
+```bash
+# Auf dem Build-Rechner: Image in eine Datei packen
+docker save looschen-datenbereitstellung:latest | gzip > looschen-image.tar.gz
+
+# Datei auf den Zielrechner bringen (USB-Stick, scp, …) und dort laden:
+docker load < looschen-image.tar.gz
+
+# Unter dem Namen bereitstellen, den compose.deploy.yml erwartet:
+docker tag looschen-datenbereitstellung:latest janallm/looschen-datenbereitstellung:latest
+docker compose -f compose.deploy.yml -f compose.linux.yml up -d
+```
+
+> Für den **Raspberry Pi** muss das Image als ARM64 gebaut werden, bevor es
+> gepackt wird: `docker buildx build --platform linux/arm64 -t
+> looschen-datenbereitstellung:latest --load .`
+
+**Weg 2 – eigene Registry im Netzwerk** (wenn mehrere Rechner regelmäßig
+ziehen sollen):
+
+```bash
+# Einmalig auf einem Server im Netz. Port 5001, denn 5000 belegt die Anwendung selbst:
+docker run -d --restart=always --name registry -p 5001:5000 \
+  -v /srv/registry:/var/lib/registry registry:2
+
+# Image dorthin schieben:
+docker tag looschen-datenbereitstellung:latest <server-ip>:5001/looschen-datenbereitstellung:latest
+docker push <server-ip>:5001/looschen-datenbereitstellung:latest
+```
+
+Jeder Zielrechner muss die Registry einmalig als HTTP-Registry erlauben — in
+`/etc/docker/daemon.json` (Docker Desktop: Settings → Docker Engine):
+
+```json
+{ "insecure-registries": ["<server-ip>:5001"] }
+```
+
+danach Docker neu starten. Ziehen und starten dann so:
+
+```bash
+docker pull <server-ip>:5001/looschen-datenbereitstellung:latest
+docker tag <server-ip>:5001/looschen-datenbereitstellung:latest janallm/looschen-datenbereitstellung:latest
+docker compose -f compose.deploy.yml -f compose.linux.yml up -d
+```
+
+> „insecure" heißt hier nur: HTTP statt HTTPS. Im eigenen, vertrauenswürdigen
+> Netz ist das üblich; soll die Registry über Netzgrenzen erreichbar sein,
+> braucht sie ein TLS-Zertifikat (siehe Docker-Registry-Doku).
+
 ### Aufrufen
 
 Im Browser öffnen:

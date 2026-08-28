@@ -7,6 +7,7 @@ Drei Wege, je nach Ziel:
 | Nur benutzen (fertige Anlage) | Docker, siehe [ANLEITUNG.md](ANLEITUNG.md) |
 | Am Code arbeiten | Nativ bauen, siehe unten |
 | Eigenes Image bauen | `docker compose build`, siehe [ANLEITUNG.md](ANLEITUNG.md) §4 |
+| Image ohne Docker Hub verteilen | Datei-Transfer oder eigene Registry, siehe [ANLEITUNG.md](ANLEITUNG.md) §4 „Image selbst hosten" |
 
 > Hinweis: Das Docker-Hub-Image `janallm/looschen-datenbereitstellung` ist
 > Stand Juli 2026 und enthält die aktuellen Fixes **nicht** — bis zum nächsten
